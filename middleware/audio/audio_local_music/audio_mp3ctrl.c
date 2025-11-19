@@ -21,6 +21,9 @@
     #include "vbe_eq_drc_api.h"
     #define VBE_OUT_BUFFER_SIZE     (sizeof(short) * MAX_NCHAN * MAX_NGRAN * MAX_NSAMP + VBE_ONE_FRAME_SAMPLES * MAX_NCHAN * sizeof(short))
 #endif
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+#include "mp3_ringbuffer.h"
+#endif
 
 #define PUBLIC_API
 
@@ -210,9 +213,32 @@ static int buf_read(mp3ctrl_handle handle, void *buf, int len)
     else
 #endif
     {
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+        if (strcmp(handle->filename, "rb") == 0)
+        {
+            size_t read_len = mp3_ring_buffer_get(buf, len);
+            if (read_len < len)
+            {
+                /* no more data, we need pause and wait network download */
+                LOG_W("%d < %d, no more data\n", read_len, len);
+                len = read_len;
+            }
+        }
+        else
+#endif
         memcpy(buf, handle->filename + handle->fd, len);
     }
     handle->fd = handle->fd + (int)len;
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+    if (strcmp(handle->filename, "rb") == 0)
+    {
+        /* notify app to read more */
+        if (handle->callback)
+        {
+            handle->callback(as_callback_cmd_user_read, NULL, (uint32_t)handle->fd);
+        }
+    }
+#endif
     return len;
 }
 static int buf_seek(mp3ctrl_handle handle, int offset)
@@ -1685,6 +1711,13 @@ static mp3ctrl_handle mp3ctrl_open_real(audio_type_t type,
         LOG_E("mp3 parameter error");
         return NULL;
     }
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+    if (strcmp(filename, "rb") == 0)
+    {
+        LOG_I("mp3 ringbuff len=%d callback=0x%x", len, (uint32_t)callback);
+    }
+    else
+#endif
     if (len == -1)
     {
         LOG_I("mp3 open %s callback=0x%x", filename, (uint32_t)callback);
@@ -2138,6 +2171,17 @@ Exit:
     return -1;
 #endif
 }
+
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+PUBLIC_API int mp3ctrl_get_total_seconds(mp3ctrl_handle handle, uint32_t *total_seconds)
+{
+    if (handle && total_seconds)
+    {
+        *total_seconds = handle->total_time_in_seconds;
+    }
+    return 0;
+}
+#endif
 
 PUBLIC_API int mp3ctrl_seek(mp3ctrl_handle handle, uint32_t seconds)
 {

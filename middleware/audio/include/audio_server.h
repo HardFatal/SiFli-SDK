@@ -90,6 +90,9 @@ typedef enum
     as_callback_cmd_play_pause       = 12, //a2dp device to AG, only notify app to chage UI, app do not pause again
     as_callback_cmd_10ms_dma         = 13,
     as_callback_cmd_user             = 100,
+#ifdef AUDIO_MP3_RINGBUFF_SUPPORT
+    as_callback_cmd_user_read        = 101, //notify app to get more data
+#endif
 } audio_server_callback_cmt_t;
 
 typedef struct audio_client_base_t *audio_client_t;

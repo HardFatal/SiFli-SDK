@@ -30,6 +30,11 @@ config AUDIO_LOCAL_MUSIC
     depends on (AUDIO_USING_AUDPROC && AUDIO && AUDIO_USING_MANAGER && BF0_HCPU)
     select PKG_USING_LIBHELIX
     default n
+config AUDIO_MP3_RINGBUFF_SUPPORT
+    bool "Enable MP3 ring buffer support"
+    depends on AUDIO_LOCAL_MUSIC
+    default n
+
 config AUDIO_BT_AUDIO
     bool "Enable BT audio"
     depends on (AUDIO_USING_AUDPROC && AUDIO)
