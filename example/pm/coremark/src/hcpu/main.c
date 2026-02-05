@@ -782,19 +782,19 @@ int main(void)
 #elif defined(SF32LB56X)
 #if defined(BSP_USING_BOARD_EC_LB563XXX)
     pin = HAL_HPAON_QueryWakeupPin(hwp_gpio1, 51);
+#elif defined(BSP_USING_BOARD_SF32LB56_WLAN_CORE_A128R12N1) || defined(BSP_USING_BOARD_SF32LB56_WLAN_CORE_N16R12N1)
+    pin = HAL_HPAON_QueryWakeupPin(hwp_gpio1, 52);
 #else
     pin = HAL_HPAON_QueryWakeupPin(hwp_gpio2, 34);
-#endif /* BSP_USING_BOARD_EC_LB563XXX */
+#endif  /* SF32LB56X */
 #elif defined(SF32LB52X)
     pin = HAL_HPAON_QueryWakeupPin(hwp_gpio1, 24);
 #else
     pin = HAL_HPAON_QueryWakeupPin(hwp_gpio1, 64);
 #endif
-
     RT_ASSERT(pin >= 0);
     status = HAL_HPAON_EnableWakeupSrc(HPAON_WAKEUP_SRC_PIN0 + pin, AON_PIN_MODE_LOW);
     RT_ASSERT(HAL_OK == status);
-
 #ifdef SF32LB52X
     h2l_ipc_init();
     rt_pm_request(PM_SLEEP_MODE_IDLE);
