@@ -62,6 +62,7 @@ extensions:
   - path:
       "tools/mkfatimg/mkfatimg"
     ignore_license: true
-
-
-    
+  - path:
+      "external/cherryusb"
+    ignore_license: true
+    ignore_copyright: true

@@ -19,7 +19,7 @@ int main(void)
 {
     rt_kprintf("cherryusb host demo!\n");
 
-    usbh_initialize(0, (uintptr_t)USBC_BASE);
+    usbh_initialize(0, (uintptr_t)USBC_BASE, RT_NULL);
 
     // Scan for USB mass storage devices (/dev/sda ~ /dev/sdz)
     rt_device_t dev = RT_NULL;
@@ -71,4 +71,3 @@ int main(void)
     }
     return 0;
 }
-
