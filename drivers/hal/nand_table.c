@@ -8,18 +8,6 @@
 #include "flash_table.h"
 
 
-typedef enum
-{
-    NAND_TYPE0 = 0,  // normal type, base on winbond w25n01gw, with NON-BUF, NO QE, EB with 4 dummy
-    NAND_TYPE1,      // based on XT26G01D, BUF, QE, EB, EB with 2 dummy
-    NAND_TYPE2,      // based on ds35x1gaxxx, BUF , QE, NO EB
-    NAND_TYPE3,      // based on tc58cyg0s3hraij, BUF, NO QE, NO EB
-    NAND_TYPE4,      // based on FM25LS01, BUF, NO QE, EB   with 4 dummy
-    NAND_TYPE5,      // based on GD5F1GM7RE, BUF, QE, EB, EB with 4 dummy
-    NAND_CMD_TABLE_CNT
-} NAND_CMD_TABLE_ID_T;
-
-
 __weak FT_CONST SPI_FLASH_FACT_CFG_T nand_cmd_table_list[] =
 {
     {
@@ -588,6 +576,11 @@ __WEAK void *get_user_flash_cfg(uint8_t isnand, uint8_t fid, uint8_t did, uint8_
 }
 #endif
 
+__WEAK const FLASH_RDID_TYPE_T *spi_nand_get_user_flash_cfg(uint8_t fid, uint8_t did, uint8_t mtype, NAND_CMD_TABLE_ID_T *cmd_tbl_type)
+{
+    return NULL;
+}
+
 
 #if defined(JLINK) || defined(KEIL)
 __weak void spi_nand_table_init(void)
@@ -636,7 +629,7 @@ FT_CONST FLASH_RDID_TYPE_T *spi_nand_get_rdid(uint8_t fid, uint8_t did, uint8_t 
 #if defined(CFG_FACTORY_DEBUG)
         res = (FLASH_RDID_TYPE_T *)get_user_flash_cfg(1, fid, did, type, flash_type);
 #else
-        res = NULL;
+        res = (FT_CONST FLASH_RDID_TYPE_T *)spi_nand_get_user_flash_cfg(fid, did, type, flash_type);
 #endif
     }
     else if (flash_type)
@@ -657,6 +650,11 @@ const SPI_FLASH_FACT_CFG_T *spi_nand_get_cmd_by_id(uint8_t fid, uint8_t did, uin
         res = (const SPI_FLASH_FACT_CFG_T *)&nand_cmd_table_list[i];
 
     return res;
+}
+
+__weak const nand_ext_cfg_t *spi_nand_get_ext_cfg_by_id(uint8_t fid, uint8_t did, uint8_t type)
+{
+    return NULL;
 }
 
 __weak int HAL_GET_FLASH_DEFAUT_INX(void)

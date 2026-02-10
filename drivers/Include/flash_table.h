@@ -33,6 +33,10 @@ extern "C" {
 
 #define NAND_ECC_START_POS              (4)
 #define NAND_ECC_FULL_RESERVED            (0xF<<NAND_ECC_START_POS)
+/** ecc status mode
+ * if ext_cfg is present in handle, the ecc_mode is only used to define ecc status register bit width, i.e. how many bits represent ecc status,
+ * the meaning is defined by ext_cfg.ecc_err_mask
+ */
 typedef enum __NAND_ECC_STATUS_MODE_
 {
     BIT2_IN_C0_T1 = 0,   // int reg c0, bit 4 and bit 5, b00 no error; b01 1-bit been corrected; others more than 1 bit and can not correct
@@ -48,9 +52,13 @@ typedef enum __NAND_ECC_STATUS_MODE_
 typedef struct FLASH_FULL_CHIP_ID
 {
     uint8_t manufacture_id;
+    /** for NAND, it's the first byte of device id */
     uint8_t memory_type;
-    uint8_t memory_density;// union 16 bits as device ID for NAND
-    uint8_t ext_flags;    // bit 0: dtr support flag for NOR, set to 0 as reserved for NAND
+    /** for NAND, it's the second byte of device id
+     * for some NAND, device id size is only one byte, the second byte is simply a repeat of manufacture_id
+     */
+    uint8_t memory_density; // union 16 bits as device ID for NAND
+    uint8_t ext_flags;      // bit 0: dtr support flag for NOR, set to 0 as reserved for NAND
     // bit 1: plane select flag for NAND, set to 0 as reserved for NOR
     // bit 2: for NAND big nand page, 0 for default 2048, 1 for 4096, set to 0 as reserved for NOR
     // bit 3: for NAND big nand blk, 0 for 64 pages, 1 for 128 pages, set to 0 as reserved for NOR
@@ -58,6 +66,16 @@ typedef struct FLASH_FULL_CHIP_ID
     uint32_t mem_size;  // flash size with bytes
 } FLASH_RDID_TYPE_T;
 
+typedef enum
+{
+    NAND_TYPE0 = 0,  // normal type, base on winbond w25n01gw, with NON-BUF, NO QE, EB with 4 dummy
+    NAND_TYPE1,      // based on XT26G01D, BUF, QE, EB, EB with 2 dummy
+    NAND_TYPE2,      // based on ds35x1gaxxx, BUF , QE, NO EB
+    NAND_TYPE3,      // based on tc58cyg0s3hraij, BUF, NO QE, NO EB
+    NAND_TYPE4,      // based on FM25LS01, BUF, NO QE, EB   with 4 dummy
+    NAND_TYPE5,      // based on GD5F1GM7RE, BUF, QE, EB, EB with 4 dummy
+    NAND_CMD_TABLE_CNT
+} NAND_CMD_TABLE_ID_T;
 
 const SPI_FLASH_FACT_CFG_T *spi_flash_get_cmd_by_id(uint8_t fid, uint8_t did, uint8_t type);
 int spi_flash_get_size_by_id(uint8_t fid, uint8_t did, uint8_t type);
@@ -69,6 +87,39 @@ int spi_nand_get_size_by_id(uint8_t fid, uint8_t did, uint8_t type);
 int spi_nand_get_plane_select_flag(uint8_t fid, uint8_t did, uint8_t type);
 int spi_nand_get_big_page_flag(uint8_t fid, uint8_t did, uint8_t type);
 int spi_nand_get_ecc_mode(uint8_t fid, uint8_t did, uint8_t type);
+
+/**
+ * @brief Get NAND extended configuration by flash chipid
+ *
+ * It's a weak function that can be overridden by user.
+ * Default implementation returns NULL, which means no extended configuration for NAND.
+ *
+ * @param[in] fid    manufacture id
+ * @param[in] did    low 8bit of device id
+ *                   for 8bit device id, did is repeat of manufacture id, mtype is used as the 8bit device id
+ * @param[in] mtype  high 8bit of device id
+ *
+ * @return pointer to nand_ext_cfg_t structure
+ *
+ */
+const nand_ext_cfg_t *spi_nand_get_ext_cfg_by_id(uint8_t fid, uint8_t did, uint8_t mtype);
+
+/**
+ * @brief Get flash type and config according to flash chipid
+ *
+ * It's a weak function that can be overridden by user to add user-defined flash
+ *
+ * @param[in] fid    manufacture id
+ * @param[in] did    low 8bit of device id, density id for NOR,
+ *                   for 8bit device id, did is repeat of manufacture id, mtype is used as the 8bit device id
+ * @param[in] mtype   high 8bit of device id, memory type of NOR
+ * @param[out] cmd_tbl_type  nand cmd table type
+ *
+ * @return pointer to FLASH_RDID_TYPE_T structure
+ *
+ */
+const FLASH_RDID_TYPE_T *spi_nand_get_user_flash_cfg(uint8_t fid, uint8_t did, uint8_t mtype, NAND_CMD_TABLE_ID_T *cmd_tbl_type);
+
 
 extern FT_CONST FLASH_RDID_TYPE_T *FT_CONST flash_cmd_id_pool[];
 extern FT_CONST SPI_FLASH_FACT_CFG_T flash_cmd_table_list[];

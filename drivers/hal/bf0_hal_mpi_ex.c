@@ -231,6 +231,7 @@ __HAL_ROM_USED HAL_StatusTypeDef HAL_FLASH_Init(QSPI_FLASH_CTX_T *ctx, qspi_conf
         hflash->wakeup = spi_nand_get_plane_select_flag(fid, did, mtype);
         hflash->dualFlash = spi_nand_get_big_page_flag(fid, did, mtype);
         hflash->dualFlash |= spi_nand_get_ecc_mode(fid, did, mtype) << 4;
+        hflash->ext_cfg = spi_nand_get_ext_cfg_by_id(fid, did, mtype);
     }
     else
 #endif
@@ -756,7 +757,25 @@ __HAL_ROM_USED int HAL_NAND_GET_ECC_RESULT(FLASH_HandleTypeDef *handle)
     res = 0;
 
     ecc_res_mode = (NAND_ECC_MODE_T)((handle->dualFlash & NAND_ECC_FULL_RESERVED) >> NAND_ECC_START_POS);
-    res = HAL_NAND_CHECK_ECC(ecc_res_mode, sta, &handle->ErrorCode);
+    if (!handle->ext_cfg)
+    {
+        res = HAL_NAND_CHECK_ECC(ecc_res_mode, sta, &handle->ErrorCode);
+    }
+    else
+    {
+        /* ecc status is saved starting from bit4 */
+        sta >>= 4;
+        HAL_ASSERT(sta < 32);
+        if (handle->ext_cfg->ecc_err_mask & (1UL << sta))
+        {
+            res = sta;
+        }
+        else
+        {
+            res = 0;
+        }
+        handle->ErrorCode |= sta;
+    }
 
     return res;
 }

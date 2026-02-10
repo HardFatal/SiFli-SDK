@@ -171,6 +171,16 @@ typedef struct
     FLASH_CMD_CFG_T cmd_cfg[SPI_FLASH_CMD_COUNT];  /*!<  command table */
 } SPI_FLASH_FACT_CFG_T;
 
+typedef struct nand_ext_cfg_tag
+{
+    /** ecc uncorrectable error mask. Each bit corresponds to one possible value of ecc status register.
+     * E.g. bit0 corresponds to ecc status value 0, bit1 corresponds to ecc status value 1, and so on.
+     * If bit is set to 1, means the corresponding ecc status value is uncorrectable error.
+     * E.g. if ecc status value 2 means uncorrectable error, then bit2 is set to 1
+     */
+    uint32_t ecc_err_mask;
+} nand_ext_cfg_t;
+
 /**
   * @brief  SPI_FLASH manufactory id
   */
@@ -283,6 +293,7 @@ typedef struct __FLASH_HandleTypeDef
     uint8_t                         wakeup;          /*!< wake up mode for psram, plane select flag for nand */
     uint32_t                        reserv1;         /*!< used as local clock divider for dual flash  */
     flash_cs_ctrl                   cs_ctrl;         /*!< cs control function pointer  */
+    const nand_ext_cfg_t            *ext_cfg;        /*!< pointer to NAND extended configuration */
 } FLASH_HandleTypeDef;
 /**
   * @}
