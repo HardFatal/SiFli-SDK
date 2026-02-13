@@ -815,7 +815,7 @@ static inline void process_speaker_tx(audio_server_t *server, audio_device_speak
 #endif
         }
 #if SOFTWARE_TX_MIX_ENABLE
-        if (rt_ringbuffer_space_len(p_rb) >= rt_ringbuffer_get_size(p_rb) / 2)
+        if (rt_ringbuffer_space_len(p_rb) >= my->tx_dma_size)
         {
             rt_event_send(&server->event, AUDIO_SERVER_EVENT_TX_HALF_EMPTY);
         }
@@ -3147,11 +3147,7 @@ static void client_callback_to_user(audio_client_t c)
     if (c && c->callback)
     {
         struct rt_ringbuffer *rb = &c->ring_buf;
-        if (rt_ringbuffer_data_len(rb) < TX_DMA_SIZE)
-        {
-            c->callback(as_callback_cmd_cache_empty, c->user_data, 0);
-        }
-        else if (rt_ringbuffer_space_len(rb) >= rt_ringbuffer_get_size(rb) / 2)
+        if (rt_ringbuffer_space_len(rb) >= rt_ringbuffer_get_size(rb) / 2)
         {
             c->callback(as_callback_cmd_cache_half_empty, c->user_data, 0);
         }
@@ -3358,7 +3354,7 @@ static void client_mix_process(audio_client_t c1, audio_client_t c2, audio_devic
         }
     }
 
-    if (rt_ringbuffer_space_len(p_mix_rb) >= rt_ringbuffer_get_size(p_mix_rb) / 2
+    if (rt_ringbuffer_space_len(p_mix_rb) >= TX_DMA_SIZE
             && (rt_ringbuffer_data_len(&c1->ring_buf) >= TX_DMA_SIZE || rt_ringbuffer_data_len(&c2->ring_buf) >= TX_DMA_SIZE)
             && (len1 >= 3 * TX_DMA_SIZE || len2 >= 3 * TX_DMA_SIZE))
     {
@@ -3640,7 +3636,7 @@ static audio_client_t audio_client_init(audio_type_t audio_type, audio_rwflag_t 
     {
 #if SOFTWARE_TX_MIX_ENABLE
         uint32_t resampled_ring_size;
-        float size = (float)tx_ring_size * 96000.0f / handle->parameter.write_samplerate + 2048;
+        float size = (float)tx_ring_size * 96000.0f / parameter->write_samplerate + 2048;
         resampled_ring_size = (uint32_t)size ;
         if (resampled_ring_size > 32000)
         {
