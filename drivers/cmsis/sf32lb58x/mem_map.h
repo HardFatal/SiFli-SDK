@@ -149,7 +149,9 @@
 #define QSPI4_MAX_SIZE      (0x4000000)
 #define QSPI5_MAX_SIZE      (0x4000000)
 
-#define SDIO_LOGIC_ADDR     (QSPI4_MEM_BASE+HPSYS_MPI_MEM_CBUS_2_SBUS_OFFSET)
+//================== SDMMC Memory Card ==================
+#define SDMMC1_MEM_BASE     (0x68000000)
+#define SDMMC2_MEM_BASE     (0xA0000000)
 
 // Size
 #define FLASH_TABLE_SIZE            (20*1024)

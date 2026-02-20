@@ -119,6 +119,10 @@
 #define QSPI3_MAX_SIZE      (0x8000000)
 #define QSPI4_MAX_SIZE      (0x2000000)
 
+//================== SDMMC Memory Card ==================
+#define SDMMC1_MEM_BASE  (0x68000000)
+#define SDMMC2_MEM_BASE  (0xA0000000)
+
 //================== Flash 1 ==================
 // Size
 #define FLASH_TABLE_SIZE            (20*1024)

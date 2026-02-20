@@ -104,6 +104,9 @@
 #define QSPI1_MAX_SIZE      (0x2000000)
 #define QSPI2_MAX_SIZE      (0xE000000)     // D-BUS max size is 0x30000000
 
+//================== SDMMC Memory Card ==================
+#define SDMMC1_MEM_BASE     (0x62000000)
+
 // Size
 #define FLASH_TABLE_SIZE            (20*1024)
 #define FLASH_CAL_TABLE_SIZE        (8*1024)
@@ -274,7 +277,11 @@ start_addr  0x0x20400000           0x20406000          0x20408000      0x2040E00
 
 // Address in C-Bus
 #define LCPU_ROM_CODE_START_ADDR     (LPSYS_ROM_BASE)
-#define LCPU_RAM_CODE_START_ADDR     (LPSYS_RAM_CBUS_BASE)
+#ifdef  USING_SEC_ENV
+    #define LCPU_RAM_CODE_START_ADDR     (LPSYS_RAM_BASE)
+#else
+    #define LCPU_RAM_CODE_START_ADDR     (LPSYS_RAM_CBUS_BASE)
+#endif
 
 // LPSYS_ROM_RAM
 #define LCPU_ROM_RAM_START_ADDR      (LPSYS_EM_END + 1 + LCPU_HCPU_AUDIO_MEM_SIZE)
@@ -319,12 +326,6 @@ start_addr  0x0x20400000           0x20406000          0x20408000      0x2040E00
 #define AUTO_FLASH_MAC_ADDRESS  (FLASH_TABLE_START_ADDR + 0xE000)
 #define SYSCFG_FACTORY_SIZE     0x2000      /*!< Max configuration size*/
 
-#define NMI_SEC_CODE_SIZE           (0x8C00)
-#define NMI_SEC_SHARE_SIZE          (0x400)
-
-#define NMI_SEC_CODE_START_ADDR      (PSRAM_BASE + PSRAM_SIZE - NMI_SEC_CODE_SIZE - NMI_SEC_SHARE_SIZE)
-#define NMI_SEC_SHARE_START_ADDR     (PSRAM_BASE + PSRAM_SIZE - NMI_SEC_SHARE_SIZE)
-
 #ifdef CUSTOM_MEM_MAP
     #ifdef SOLUTION_WATCH
         #include "flash_map.h"
@@ -332,6 +333,20 @@ start_addr  0x0x20400000           0x20406000          0x20408000      0x2040E00
         #include "custom_mem_map.h"
     #endif
 #endif /* CUSTOM_MEM_MAP */
+
+#ifndef NMI_SEC_CODE_SIZE
+    #define NMI_SEC_CODE_SIZE           (0x8C00)
+#endif
+#ifndef NMI_SEC_SHARE_SIZE
+    #define NMI_SEC_SHARE_SIZE          (0x400)
+#endif
+
+#ifndef NMI_SEC_CODE_START_ADDR
+    #define NMI_SEC_CODE_START_ADDR      (PSRAM_BASE + PSRAM_SIZE - NMI_SEC_CODE_SIZE - NMI_SEC_SHARE_SIZE)
+#endif
+#ifndef NMI_SEC_SHARE_START_ADDR
+    #define NMI_SEC_SHARE_START_ADDR     (PSRAM_BASE + PSRAM_SIZE - NMI_SEC_SHARE_SIZE)
+#endif
 
 #define HPSYS_RAM_IN_ITCM(addr) false
 #endif  /* __MEM_MAP__ */
