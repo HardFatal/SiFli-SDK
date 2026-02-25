@@ -24,6 +24,7 @@
 
 #ifdef RT_USING_MEMHEAP
 
+#ifndef RT_USING_MEMHEAP2
 #define RT_MEMHEAP_BACKUP_OPT
 
 /* dynamic pool magic and mask */
@@ -1220,4 +1221,5 @@ rt_uint32_t used_sram_size(void)
 }
 #endif
 
-#endif
+#endif /* RT_USING_MEMHEAP2 */
+#endif /* RT_USING_MEMHEAP */
