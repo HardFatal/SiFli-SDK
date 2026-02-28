@@ -1,4 +1,5 @@
 # Wi-Fi 示例
+源码路径：example/rt_device/wifi
 
 ## 概述
 

@@ -1,4 +1,5 @@
 # peripheral_with_ota example说明和SDK DFU接入
+源码路径：example/ble/peripheral_with_ota
 
 ## 支持的平台
 全平台

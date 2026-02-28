@@ -1,4 +1,5 @@
 # USB_MSTORAGE示例
+源码路径：example/rt_device/usb/usb_mstorage
 ## 概述
 例程展示了USB作为device设备的U盘功能，可以在pc上挂载本地的文件系统。
 

@@ -1,6 +1,6 @@
 # RGBLED示例
 
-源码路径：example/rt_device/rgbled
+源码路径：example/rt_device/rgb_led
 
 ## 支持的平台
 <!-- 支持哪些板子和芯片平台 -->

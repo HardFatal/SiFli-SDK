@@ -1,4 +1,5 @@
 # FatFs NAND 示例
+源码路径：example/storage/fatfs/nand
 
 ## 支持的开发板
 - sf32lb52-lcd_a128r16

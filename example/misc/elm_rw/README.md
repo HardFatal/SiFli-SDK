@@ -1,4 +1,5 @@
 # ELM_RW示例
+源码路径：example/misc/elm_rw
 ## 概述
 例程展示了使用ELM进行文件数据读传输操作，搭配FsrwTool进行可视化文件传输。
 

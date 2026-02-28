@@ -1,4 +1,5 @@
 # USB_VCOM示例
+源码路径：example/rt_device/usb/usb_vcom
 ## 概述
 例程展示了USB作为device设备的虚拟串口功能，可以在pc上以串口方式访问USB设备。
 

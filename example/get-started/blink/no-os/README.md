@@ -1,4 +1,5 @@
 # 点灯（NO-OS）
+源码路径：example/get-started/blink/no-os
 ## 概述
 例程展示了通过GPIO实现LED闪烁功能，以便更好的理解GPIO的使用。
 

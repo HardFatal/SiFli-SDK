@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 简体中文
 
-源码路径: example/cherryusb/host/msc
+源码路径：example/cherryusb/host/msc_host
 
 ## 概述
 本示例演示如何使用CherryUSB协议栈实现USB Host大容量存储设备（MSC）功能。该例程可以识别U盘等USB存储设备，并进行文件读写操作。

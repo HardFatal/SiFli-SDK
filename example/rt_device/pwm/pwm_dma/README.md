@@ -1,6 +1,6 @@
 # PWM_DMA示例
 
-源码路径：example\rt_device\pwm
+源码路径：example/rt_device/pwm/pwm_dma
 ## 支持的平台
 例程可以运行在以下开发板.
 * sf32lb52-lcd系列

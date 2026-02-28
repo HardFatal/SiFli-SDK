@@ -1,6 +1,6 @@
 # WDT示例
 
-源码路径：example/rt_device/wdt/wdt
+源码路径：example/rt_device/wdt
 
 ## 支持的平台
 <!-- 支持哪些板子和芯片平台 -->

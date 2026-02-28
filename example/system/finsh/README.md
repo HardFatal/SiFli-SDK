@@ -1,4 +1,5 @@
 # FinSH
+源码路径：example/system/finsh
 
 ## 支持的平台
 例程可以运行在以下开发板.

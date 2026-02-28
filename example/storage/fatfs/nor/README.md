@@ -1,4 +1,5 @@
 # FatFs NOR 示例
+源码路径：example/storage/fatfs/nor
 
 ## 支持的开发板
 - sf32lb52-lcd_n16r8
