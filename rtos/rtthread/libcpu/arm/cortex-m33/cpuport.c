@@ -24,9 +24,9 @@
     #include "ulog.h"
 #endif
 
-#ifdef USING_CORE_DUMP
-    #include "core_dump.h"
-#endif /* USING_CORE_DUMP */
+#ifdef USING_COREDUMP
+    #include "coredump.h"
+#endif /* USING_COREDUMP */
 
 #if               /* ARMCC */ (  (defined ( __CC_ARM ) && defined ( __TARGET_FPU_VFP ))    \
                   /* Clang */ || (defined ( __CLANG_ARM ) && defined ( __VFP_FP__ ) && !defined(__SOFTFP__)) \
@@ -450,6 +450,10 @@ static void handle_exception(struct exception_info *exception_info)
     saved_scb_reg.bfar = SCB_BFAR;
     saved_scb_reg.shcsr = SCB_SHCSR;
 
+#if defined(COREDUMP_MINIDUMP_ENABLED)
+    coredump_minimum();
+#endif /* COREDUMP_MINIDUMP_ENABLED */
+
 #if defined(RT_USING_ULOG)
     rt_device_t dev = rt_console_get_device();
     if (dev)
@@ -541,9 +545,9 @@ __ROM_USED void rt_hw_hard_fault_exception(struct exception_info *exception_info
     ulog_flush();
 #endif
 
-#if defined(SOC_BF0_HCPU) && defined(USING_CORE_DUMP)
-    core_dump();
-#endif /* SOC_BF0_HCPU && USING_CORE_DUMP */
+#if defined(USING_COREDUMP)
+    coredump();
+#endif /* USING_COREDUMP */
 
 #if defined(SOC_BF0_HCPU) && defined(SAVE_ASSERT_CONTEXT_IN_FLASH)
     extern void HAL_LCPU_ASSERT_INFO_clear(void);
@@ -567,9 +571,9 @@ __ROM_USED void rt_hw_mem_manage_exception(struct exception_info *exception_info
     ulog_flush();
 #endif
 
-#if defined(SOC_BF0_HCPU) && defined(USING_CORE_DUMP)
-    core_dump();
-#endif /* SOC_BF0_HCPU && USING_CORE_DUMP */
+#if defined(USING_COREDUMP)
+    coredump();
+#endif /* USING_COREDUMP */
 
 #if defined(SOC_BF0_HCPU) && defined(SAVE_ASSERT_CONTEXT_IN_FLASH)
     extern void HAL_LCPU_ASSERT_INFO_clear(void);
@@ -618,6 +622,10 @@ __ROM_USED void rt_hw_do_fatal_error(struct stack_frame *stack_frame)
         rt_kprintf("fatal error on ISR\n");
     }
 
+#if defined(COREDUMP_MINIDUMP_ENABLED)
+    coredump_minimum();
+#endif /* COREDUMP_MINIDUMP_ENABLED */
+
 #if defined(RT_USING_ULOG)
     ulog_flush();
 #endif
@@ -635,9 +643,9 @@ __ROM_USED void rt_hw_do_fatal_error(struct stack_frame *stack_frame)
     HAL_LPAON_WakeCore(CORE_ID_HCPU);
 #endif /* SOC_BF0_LCPU */
 
-#if defined(SOC_BF0_HCPU) && defined(USING_CORE_DUMP)
-    core_dump();
-#endif /* SOC_BF0_HCPU && USING_CORE_DUMP */
+#if defined(USING_COREDUMP)
+    coredump();
+#endif /* USING_COREDUMP */
 
 #if defined(SOC_BF0_HCPU) && defined(SAVE_ASSERT_CONTEXT_IN_FLASH)
     extern void HAL_LCPU_ASSERT_INFO_clear(void);
@@ -667,6 +675,19 @@ __ROM_USED void rt_hw_cpu_shutdown(void)
 RT_WEAK void rt_hw_cpu_reset(void)
 {
     SCB_AIRCR = SCB_RESET_VALUE;
+}
+
+void rt_coredump_info_dump(rt_mem_dump_cb_t dump_cb)
+{
+    if (!dump_cb)
+    {
+        return;
+    }
+
+    dump_cb((uint32_t)&saved_stack_frame, sizeof(saved_stack_frame), RT_NULL, RT_NULL);
+    dump_cb((uint32_t)&saved_stack_pointer, sizeof(saved_stack_pointer), RT_NULL, RT_NULL);
+    dump_cb((uint32_t)&error_reason, sizeof(error_reason), RT_NULL, RT_NULL);
+    dump_cb((uint32_t)&saved_scb_reg, sizeof(saved_scb_reg), RT_NULL, RT_NULL);
 }
 
 #ifdef RT_USING_CPU_FFS

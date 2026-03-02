@@ -616,6 +616,8 @@ const char *rt_get_version(void);
 
 void rt_show_sys_info(void);
 
+void rt_coredump_info_dump(rt_mem_dump_cb_t dump_cb);
+
 #ifdef RT_DEBUG
 extern void (*rt_assert_hook)(const char *ex, const char *func, rt_size_t line);
 void rt_assert_set_hook(void (*hook)(const char *ex, const char *func, rt_size_t line));
