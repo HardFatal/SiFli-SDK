@@ -348,6 +348,20 @@ rt_err_t rt_memheap_backup(struct rt_memheap *heap, rt_uint8_t *buf,
                            rt_uint32_t max_size, rt_uint32_t *used_size);
 rt_err_t rt_memheap_restore(void *instance, rt_uint8_t *buf, rt_uint32_t size, rt_compressor_cb_t decompressor_cb);
 
+/**
+ * @brief dump memheap
+ *
+ * @param heap the memheap to dump
+ * @param dump_cb the callback function to dump memory, it will be called multiple times until all memory is dumped
+ * @param user_data user data, it will be passed to dump_cb when called
+ * @param dump_size pointer to the size of the dumped memory, excluding header size
+ * @param actual_size pointer to the actual size of the dumped memory, including header size
+ *
+ * @return RT_EOK on success, RT_EFULL if the dump buffer is full, other error code on failure
+ */
+rt_err_t rt_memheap_dump(struct rt_memheap *heap, rt_mem_dump_cb_t dump_cb, void *user_data, rt_uint32_t *dump_size, rt_uint32_t *actual_size);
+
+
 
 #ifdef RT_USING_MEMHEAP_AS_HEAP
 rt_err_t rt_memheap_add_to_sys(struct rt_memheap *heap);

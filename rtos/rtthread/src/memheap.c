@@ -991,6 +991,74 @@ __ROM_USED rt_err_t rt_memheap_restore(void *instance, rt_uint8_t *buf, rt_uint3
     return RT_EOK;
 }
 
+rt_err_t rt_memheap_dump(struct rt_memheap *heap, rt_mem_dump_cb_t dump_cb, void *user_data, rt_uint32_t *dump_size, rt_uint32_t *actual_size)
+{
+    rt_uint32_t copy_size;
+    rt_uint32_t ret_size;
+#ifdef RT_MEMHEAP_BACKUP_OPT
+    struct rt_memheap_item *next;
+    rt_uint32_t total_actual_size;
+#endif /* RT_MEMHEAP_BACKUP_OPT */
+
+    if (!heap || !dump_cb)
+    {
+        return RT_ERROR;
+    }
+
+#ifndef RT_MEMHEAP_BACKUP_OPT
+    copy_size = rt_memheap_used_size(heap);
+    ret_size = dump_cb((void *)heap->start_addr, copy_size, user_data, actual_size);
+    if (dump_size)
+    {
+        *dump_size = ret_size;
+    }
+    if (ret_size < copy_size)
+    {
+        return RT_EFULL;
+    }
+#else
+    next = heap->block_list;
+    total_actual_size = 0;
+    if (dump_size)
+    {
+        *dump_size = 0;
+    }
+    while (next < RT_MEMHEAP_TAILER(heap))
+    {
+        if (RT_MEMHEAP_IS_USED(next))
+        {
+            /* copy header and data */
+            copy_size = (rt_uint32_t)next->next - (rt_uint32_t)next;
+        }
+        else
+        {
+            /* only copy header */
+            copy_size = RT_MEMHEAP_SIZE;
+        }
+
+        ret_size = dump_cb((rt_uint32_t)next, copy_size, user_data, actual_size);
+        if (actual_size)
+        {
+            total_actual_size += *actual_size;
+            *actual_size = total_actual_size;
+        }
+        if (dump_size)
+        {
+            *dump_size += ret_size;
+        }
+        if (ret_size < copy_size)
+        {
+            return RT_EFULL;
+        }
+        next = next->next;
+    }
+
+#endif
+
+    return RT_EOK;
+}
+
+
 #ifndef SOC_BF0_LCPU
 rt_size_t rt_heapmem_size(void *rmem)
 {
