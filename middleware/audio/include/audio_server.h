@@ -67,6 +67,13 @@ typedef enum
 
 typedef enum
 {
+    FADE_NONE   = 0,
+    FADE_START  = 1,
+    FADE_END    = 2,
+} fade_state_e;
+
+typedef enum
+{
     as_callback_cmd_opened           = 0,
     as_callback_cmd_closed           = 1,
     as_callback_cmd_muted            = 2,
@@ -189,6 +196,7 @@ int audio_write(audio_client_t handle, uint8_t *data, uint32_t data_len);
 int audio_read(audio_client_t handle, uint8_t *buf, uint32_t buf_size);
 
 #define AUDIO_IOCTL_FADE_OUT_START                  -1  // parameter type is NA
+#define AUDIO_IOCTL_FADE_OUT_STOP                   -2  // parameter type is NA
 #define AUDIO_IOCTL_FACTORY_LOOPBACK_GAIN           0   // parameter type is uint32_t
 #define AUDIO_IOCTL_FLUSH_TIME_MS                   1   // parameter type is uint32_t *
 #define AUDIO_IOCTL_IS_FADE_OUT_DONE                2   // parameter type is NA

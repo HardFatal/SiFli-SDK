@@ -34,7 +34,6 @@
 
 #define CACHE_BUF_SIZE          (3*MAINBUF_SIZE + 100)
 
-#define FADE_OUT_TIME_MS      1000
 
 #define MP3_ONE_STEREO_FRAME_SIZE (MAX_NCHAN * MAX_NGRAN * MAX_NSAMP * 2)
 #define MP3_FRAME_CACHE_COUNT (4) // if not a2dp source, 2 is enough
@@ -106,6 +105,7 @@ struct mp3ctrl_t
     mp3_info_t      frameinfo;
     //source
     audio_client_t  client;
+    fade_state_e    fade_out_state;
 #if PKG_USING_VBE_DRC
     void            *vbe;
     int             last_veb_out_bytes;
@@ -121,6 +121,7 @@ struct mp3ctrl_t
     uint8_t         is_suspended;
     uint8_t         is_wave;
     uint8_t         is_file_end;
+
     //wave
     uint32_t        wave_bytes_per_second;
     uint32_t        wave_samplerate;
@@ -428,6 +429,10 @@ static void replace(mp3ctrl_handle ctrl)
     MP3FrameInfo frameinfo;
     uint32_t file_size;
     mp3_cmt_t  *p_cmd;
+
+    ctrl->fade_out_state = FADE_NONE;
+    audio_ioctl(ctrl->client, AUDIO_IOCTL_FADE_OUT_STOP, 0);
+
 #if RT_USING_DFS
     if (ctrl->is_file && ctrl->fd >= 0)
     {
@@ -781,7 +786,6 @@ static void mp3ctrl_thread_entry_file(void *parameter)
 
     RT_ASSERT(outBuf);
 
-    rt_tick_t start = 0;
     int nFrames = 0;
     rt_uint32_t evt;
     LOG_I("mp3 run...ctrl=0x%x", ctrl);
@@ -813,20 +817,28 @@ static void mp3ctrl_thread_entry_file(void *parameter)
             }
             else if (is_closing == 0)
             {
-                LOG_I("mp3 fade");
                 is_closing = 1;
-                start = rt_tick_get_millisecond();
-                audio_ioctl(ctrl->client, -1, 0); //fade out
+                if (ctrl->fade_out_state == FADE_NONE)
+                {
+                    LOG_I("mp3 fade out");
+                    if (!audio_ioctl(ctrl->client, AUDIO_IOCTL_FADE_OUT_START, 0))
+                    {
+                        ctrl->fade_out_state = FADE_START;
+                    }
+                    else
+                    {
+                        ctrl->fade_out_state = FADE_END;
+                    }
+                }
             }
         }
         if (is_closing)
         {
             if (ctrl->is_suspended
-                    || !audio_ioctl(ctrl->client, 2, NULL)
-                    || (rt_tick_get_millisecond() - start) > FADE_OUT_TIME_MS)
+                    || (ctrl->fade_out_state == FADE_END)
+                    || !audio_ioctl(ctrl->client, AUDIO_IOCTL_IS_FADE_OUT_DONE, NULL))
             {
                 LOG_I("mp3 fade done");
-                rt_thread_mdelay(50);
                 break;
             }
         }
@@ -992,9 +1004,12 @@ static void mp3ctrl_thread_entry_file(void *parameter)
         if (find_sync_in_cache(ctrl) < 0)
         {
             uint32_t cache_time_ms = 150;
-            audio_ioctl(ctrl->client, 1, &cache_time_ms);
+            audio_ioctl(ctrl->client, AUDIO_IOCTL_FLUSH_TIME_MS, &cache_time_ms);
             rt_thread_mdelay(cache_time_ms + 20);
-
+            if (ctrl->fade_out_state == FADE_START)
+            {
+                ctrl->fade_out_state == FADE_END;
+            }
             if (ctrl->loop_times > 0)
             {
                 ctrl->is_file_end = 0;
@@ -1207,7 +1222,6 @@ static void wave_thread_entry_file(void *parameter)
     uint8_t  cache_full_occured = 0;
     uint8_t  old_channels = -1;;
     uint32_t old_samplerate = -1;
-    rt_tick_t start = 0;
     mp3ctrl_handle ctrl = (mp3ctrl_handle)parameter;
     short *outBuf = audio_mem_malloc(WAV_FRAME_SIZE);
     RT_ASSERT(outBuf);
@@ -1245,17 +1259,26 @@ static void wave_thread_entry_file(void *parameter)
             }
             else if (is_closing == 0)
             {
-                LOG_I("wav fade");
                 is_closing = 1;
-                start = rt_tick_get_millisecond();
-                audio_ioctl(ctrl->client, -1, 0); //fade out
+                if (ctrl->fade_out_state == FADE_NONE)
+                {
+                    if (!audio_ioctl(ctrl->client, AUDIO_IOCTL_FADE_OUT_START, 0))
+                    {
+                        LOG_I("wav fade out");
+                        ctrl->fade_out_state = FADE_START;
+                    }
+                    else
+                    {
+                        ctrl->fade_out_state = FADE_END;
+                    }
+                }
             }
         }
         if (is_closing)
         {
             if (ctrl->is_suspended
-                    || !audio_ioctl(ctrl->client, 2, NULL)
-                    || (rt_tick_get_millisecond() - start) > FADE_OUT_TIME_MS)
+                    || (ctrl->fade_out_state == FADE_END)
+                    || !audio_ioctl(ctrl->client, AUDIO_IOCTL_IS_FADE_OUT_DONE, NULL))
             {
                 LOG_I("wav fade done");
                 break;
@@ -1421,9 +1444,13 @@ check_write_result:
         {
             //wait cache out to speaker
             uint32_t cache_time_ms = 150;
-            audio_ioctl(ctrl->client, 1, &cache_time_ms);
+            audio_ioctl(ctrl->client, AUDIO_IOCTL_FLUSH_TIME_MS, &cache_time_ms);
             rt_thread_mdelay(cache_time_ms + 20);
             ctrl->is_file_end = 1;
+            if (ctrl->fade_out_state == FADE_START)
+            {
+                ctrl->fade_out_state == FADE_END;
+            }
             if (ctrl->loop_times > 0)
             {
                 ctrl->loop_times--;
@@ -1906,6 +1933,44 @@ PUBLIC_API int mp3ctrl_ioctl(mp3ctrl_handle handle, int cmd, uint32_t param)
 {
     if (!handle || handle->magic != MP3_HANDLE_MAGIC)
         return -1;
+
+    if (cmd == MP3CTRL_IOCTRL_FADE_OUT_START)
+    {
+        if (handle->client)
+        {
+            handle->fade_out_state = FADE_START;
+            audio_ioctl(handle->client, AUDIO_IOCTL_FADE_OUT_START, 0);
+        }
+        return 0;
+    }
+
+    if (cmd == MP3CTRL_IOCTRL_FADE_OUT_STOP)
+    {
+        if (handle->client)
+        {
+            handle->fade_out_state = FADE_NONE;
+            audio_ioctl(handle->client, AUDIO_IOCTL_FADE_OUT_STOP, 0);
+        }
+        return 0;
+    }
+
+    if (cmd == MP3CTRL_IOCTRL_IS_FADE_OUT_DONE)
+    {
+        if (handle->client)
+        {
+            int ret = audio_ioctl(handle->client, AUDIO_IOCTL_IS_FADE_OUT_DONE, 0);
+            if (ret == 0)
+            {
+                handle->fade_out_state = FADE_END;
+            }
+            return ret;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
     if (cmd == MP3CTRL_IOCTRL_LOOP_TIMES)
     {
         handle->loop_times = param;
@@ -1926,6 +1991,7 @@ PUBLIC_API int mp3ctrl_ioctl(mp3ctrl_handle handle, int cmd, uint32_t param)
         mp3_cmt_t *cmd_msg = audio_mem_calloc(1, sizeof(mp3_cmt_t));
         RT_ASSERT(cmd_msg);
         cmd_msg->cmd = MP3_NEXT;
+
 #if RT_USING_DFS
         if (p->len == -1)
         {
@@ -2373,8 +2439,17 @@ again:
             mp3_ioctl_cmd_param_t para;
             para.filename = argv[2];
             para.len = -1;
+            LOG_I("mp3 fade out start");
+            mp3ctrl_ioctl(g_handle1, MP3CTRL_IOCTRL_FADE_OUT_START, 0);
+            for (int i = 0; i < 100; i++)
+            {
+                if (!mp3ctrl_ioctl(g_handle1, MP3CTRL_IOCTRL_IS_FADE_OUT_DONE, 0))
+                {
+                    break;
+                }
+                rt_thread_mdelay(10);
+            }
             mp3ctrl_ioctl(g_handle1, 1, (uint32_t)&para);
-            return;
         }
         LOG_I("next none");
     }

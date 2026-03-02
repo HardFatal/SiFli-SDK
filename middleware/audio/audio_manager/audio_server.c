@@ -240,6 +240,7 @@ struct audio_client_base_t
     rt_list_t                   node;
 
     uint32_t                    magic;
+    rt_tick_t                   fade_out_start_tick;
     const char                  *name; //only for debug use
     rt_event_t                  api_event;
     audio_server_callback_func  callback;
@@ -257,10 +258,9 @@ struct audio_client_base_t
     audio_type_t                audio_type;
     audio_device_e              device_specified;
     audio_device_e              device_using;
+    fade_state_e                fade_out_state;
+    uint8_t                     fade_out_index;
     uint8_t                     is_3a_opened;
-    uint8_t                     is_fade_vol; // 1--fade out, 2 fade in
-    uint8_t                     is_fade_end;
-    uint8_t                     fade_vol_steps;
     uint8_t                     is_suspended;
     uint8_t                     is_factory_loopback;
     uint8_t                     debug_full;
@@ -358,7 +358,6 @@ typedef struct
 
     audio_device_ctrl_t devices_ctrl[AUDIO_DEVICE_NUMBER];
 
-    rt_tick_t           last_tick;
     audio_device_speaker_t device_speaker_private;
 #if !MULTI_CLIENTS_AT_WORKING
     audio_client_t      only_one_client;
@@ -425,6 +424,13 @@ bool audio_server_is_ble_src_enable(void)
 {
     return ble_bap_src_enabled;
 }
+
+static const uint8_t g_fade_out_table[] =
+{
+    0, /* start flag, don't change */
+    1, 3, 5, 7, 11, 15, 16, 16, /* shift table */
+    255 /* last flat, don't change */
+};
 
 /*
  if could not mix, than check priority, if priority is same, then new audio suspend old audio
@@ -614,63 +620,6 @@ static void inline speaker_update_volume(audio_device_speaker_t *my, int16_t spf
         }
         else if (my->audcodec_dev)
         {
-#if SOFTWARE_TX_MIX_ENABLE
-            //todo: multi stream fade out
-#else
-            if (first->is_fade_vol && !first->is_fade_end)
-            {
-                rt_tick_t tick = rt_tick_get_millisecond();
-                if (tick - g_server.last_tick > FADE_INTERVAL_MS)
-                {
-                    g_server.last_tick = tick;
-                    if (first->is_fade_vol == 1) //fade out
-                    {
-                        if (first->fade_vol_steps <= vol)
-                        {
-                            //2 volume step, using 1 is slowly
-                            first->fade_vol_steps += FADE_VOLUME_STEP;
-                            if (first->fade_vol_steps >= vol)
-                            {
-                                vol = 0;
-                            }
-                            else
-                            {
-                                vol = vol - first->fade_vol_steps;
-                            }
-                        }
-                        else
-                        {
-                            vol = 0;
-                            first->is_fade_end = 1;
-                        }
-                    }
-                    else //fade in
-                    {
-                        if (first->fade_vol_steps < vol)
-                        {
-                            first->fade_vol_steps += FADE_VOLUME_STEP;
-                            if (first->fade_vol_steps < vol)
-                            {
-                                vol = first->fade_vol_steps ;
-                            }
-                        }
-                        else
-                        {
-                            first->is_fade_vol = 0; //fade in end
-                            first->is_fade_end = 1;
-                        }
-                    }
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else if (first->is_fade_vol == 1 && first->is_fade_end)
-            {
-                vol = 0;
-            }
-#endif
             if (audio_type == AUDIO_TYPE_BT_VOICE || audio_type == AUDIO_TYPE_MODEM_VOICE)
                 volx2 = eq_get_tel_volumex2(vol);
             else
@@ -694,7 +643,7 @@ static void inline speaker_update_volume(audio_device_speaker_t *my, int16_t spf
         }
     }
 
-    if (my->is_eq_mute_volume && !first->is_fade_vol)
+    if (my->is_eq_mute_volume)
     {
         memset(spframe, 0, len * 2);
         return;
@@ -2976,6 +2925,78 @@ void auido_gain_pcm(int16_t *p, rt_size_t len, uint8_t shift)
     }
 }
 
+static inline int get_zero_crosss_index(int16_t *p, uint32_t samples)
+{
+    int i;
+    int32_t start = p[0];
+
+    for (i = 1; i < samples; i++)
+    {
+        if ((int32_t)(p[i] * start) <= 0)
+        {
+            break;
+        }
+    }
+    return i;
+}
+
+static void fade_out(audio_client_t c, uint8_t *data, uint32_t data_len, uint32_t data_time_ms)
+{
+    (void)(data_time_ms); /* not compute timer to change step now */
+
+    if (c->fade_out_state == FADE_NONE)
+    {
+        return;
+    }
+
+    if (c->fade_out_state == FADE_END)
+    {
+        memset(data, 0, data_len);
+        return;
+    }
+
+    if (c->fade_out_state == FADE_START)
+    {
+        uint8_t shift = g_fade_out_table[c->fade_out_index];
+        uint32_t samples = data_len >> 1;
+        int16_t *p = (int16_t *)data;
+
+        int index = get_zero_crosss_index(p, samples);
+
+        for (int i = 0; i < index; i++)
+        {
+            p[i] >>= shift;
+        }
+
+        LOG_I("fade out %d", shift);
+
+        if (c->fade_out_index + 1 < sizeof(g_fade_out_table) / sizeof(g_fade_out_table[0]))
+        {
+            c->fade_out_index++;
+            shift = g_fade_out_table[c->fade_out_index];
+            if (shift == 255)
+            {
+                c->fade_out_state = FADE_END;
+                shift = 16;
+                LOG_I("fade out end");
+            }
+        }
+
+        for (int i = index; i < samples; i++)
+        {
+            p[i] >>= shift;
+        }
+
+        if (c->fade_out_state == FADE_END)
+        {
+            for (int i = index; i < samples; i++)
+            {
+                p[i] = 0;
+            }
+        }
+    }
+}
+
 /**
   * @brief  bt voice data coming indication
   * @param  fifo: data pointer
@@ -3120,7 +3141,7 @@ static inline void stereo2mono(int16_t *stereo, uint32_t samples, int16_t *mono)
     }
 }
 
-static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t data_len)
+static int audio_write_resample(audio_client_t c, uint8_t *data, uint32_t data_len)
 {
     audio_server_t *server = get_server();
     uint32_t out_bytes;
@@ -3143,6 +3164,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
             return 0;
         }
         c->debug_full = 0;
+        fade_out(c, data, data_len, data_len * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
         rt_ringbuffer_put(&c->ring_buf, data, data_len);
         return data_len;
     }
@@ -3178,6 +3200,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
         {
             mono2stereo((int16_t *)data, TX_DMA_SIZE / 2, &c->resample_dst[0]);
             out_bytes = sifli_resample_process(c->resample, c->resample_dst, TX_DMA_SIZE * 2, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
             data_len -= TX_DMA_SIZE;
             data += TX_DMA_SIZE;
@@ -3187,6 +3210,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
             RT_ASSERT(data_len < TX_DMA_SIZE);
             mono2stereo((int16_t *)data, data_len / 2, &c->resample_dst[0]);
             out_bytes = sifli_resample_process(c->resample, c->resample_dst, data_len * 2, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
         }
     }
@@ -3203,6 +3227,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
         {
             stereo2mono((int16_t *)data, TX_DMA_SIZE / 2, &c->resample_dst[0]);
             out_bytes = sifli_resample_process(c->resample, c->resample_dst, TX_DMA_SIZE / 2, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
             data_len -= TX_DMA_SIZE;
             data += TX_DMA_SIZE;
@@ -3211,6 +3236,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
         {
             stereo2mono((int16_t *)data, data_len / 2, &c->resample_dst[0]);
             out_bytes = sifli_resample_process(c->resample, c->resample_dst, data_len / 2, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
         }
     }
@@ -3226,6 +3252,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
         for (int i = 0; i < data_len / TX_DMA_SIZE; i++)
         {
             out_bytes = sifli_resample_process(c->resample, (int16_t *)data, TX_DMA_SIZE, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
             data_len -= TX_DMA_SIZE;
             data += TX_DMA_SIZE;
@@ -3233,6 +3260,7 @@ static int audio_write_resample(audio_client_t c,        uint8_t *data, uint32_t
         if (data_len > 0)
         {
             out_bytes = sifli_resample_process(c->resample, (int16_t *)data, data_len, 0);
+            fade_out(c, (uint8_t *)c->resample->dst, out_bytes, out_bytes * 1000 * 2 / c->parameter.write_samplerate / c->parameter.write_channnel_num);
             rt_ringbuffer_put(&c->ring_buf, (uint8_t *)c->resample->dst, out_bytes);
         }
     }
@@ -3842,6 +3870,7 @@ put_raw:
         }
     }
 
+    fade_out(handle, data, data_len, data_len * 1000 * 2 / handle->parameter.write_samplerate / handle->parameter.write_channnel_num);
     len = rt_ringbuffer_put(&handle->ring_buf, data, data_len);
 #if defined(BT_BAP_BROADCAST_SINK) || defined(BT_BAP_BROADCAST_SOURCE)
     if (len != data_len)
@@ -3898,13 +3927,13 @@ AUDIO_API int audio_ioctl(audio_client_t handle, int cmd, void *parameter)
     }
     else if (cmd == AUDIO_IOCTL_IS_FADE_OUT_DONE)
     {
-#if !SOFTWARE_TX_MIX_ENABLE
         ret = -1;
-        if (handle->is_fade_vol && handle->is_fade_end)
+        if (handle->fade_out_state != FADE_START
+                || rt_tick_get_millisecond() - handle->fade_out_start_tick > 5000)
         {
+            LOG_I("audio fade out check done");
             ret = 0;
         }
-#endif
     }
     else if (cmd == AUDIO_IOCTL_BYTES_IN_CACHE)
     {
@@ -3918,17 +3947,15 @@ AUDIO_API int audio_ioctl(audio_client_t handle, int cmd, void *parameter)
     }
     else if (cmd == AUDIO_IOCTL_FADE_OUT_START)
     {
-#if !SOFTWARE_TX_MIX_ENABLE
-        lock();
-        if (!handle->is_suspended)
-        {
-            handle->is_fade_vol = 1;
-            handle->is_fade_end = 0;
-            handle->fade_vol_steps = 0;
-            g_server.last_tick = rt_tick_get_millisecond();
-        }
-        unlock();
-#endif
+        LOG_I("audio fade out start");
+        handle->fade_out_state = FADE_START;
+        handle->fade_out_index = 0;
+        handle->fade_out_start_tick = rt_tick_get_millisecond();
+    }
+    else if (cmd == AUDIO_IOCTL_FADE_OUT_STOP)
+    {
+        handle->fade_out_state = FADE_NONE;
+        handle->fade_out_index = 0;
     }
     else if (cmd == AUDIO_IOCTL_ENABLE_CPU_LOW_SPEED)
     {

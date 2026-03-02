@@ -41,6 +41,10 @@ typedef struct
 #define MP3CTRL_IOCTRL_LOOP_TIMES           0
 #define MP3CTRL_IOCTRL_CHANGE_FILE          1
 #define MP3CTRL_IOCTRL_THREAD_PRIORITY      2
+#define MP3CTRL_IOCTRL_FADE_OUT_START       3
+#define MP3CTRL_IOCTRL_IS_FADE_OUT_DONE     4
+#define MP3CTRL_IOCTRL_FADE_OUT_STOP        5
+
 /*
 open:
     return NULL if file error
