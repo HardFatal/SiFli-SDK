@@ -184,11 +184,16 @@ sdk.py --user <namespace> sf-pkg-upload --name 包名/版本号@命名空间
    ```bash
    sdk.py sf-pkg-remove --name 包名
    ```
-2. 重新构建：
+2. （可选）清除远端仓库中的包：
+   ```bash
+   sdk.py sf-pkg-remove --name 包名/版本号@命名空间 --remote
+   ```
+   说明：`--remote` 会删除远端 `artifactory` 中的包，执行前请先登录。
+3. 重新构建：
    ```bash
    sdk.py sf-pkg-build --version 版本号
    ```
-3. 再次上传：
+4. 再次上传：
    ```bash
    sdk.py sf-pkg-upload --name 包名/版本号@命名空间
    ```

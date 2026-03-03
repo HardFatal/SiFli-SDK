@@ -219,7 +219,13 @@ def upload_callback(sdk_ctx: SdkContext, name: str, keep: bool = False) -> None:
         print_warning(f"WARNING: Failed to sync to public repository: {exc}")
 
 
-def remove_callback(sdk_ctx: SdkContext, name: str) -> None:
+def remove_callback(sdk_ctx: SdkContext, name: str, remote: bool = False) -> None:
+    if remote:
+        _ensure_remote_login(sdk_ctx, required=True)
+        sdk_ctx.runner.run(["conan", "remove", name, "-r=artifactory", "-c"], cwd=sdk_ctx.project_dir)
+        print(f"Package {name} removed from remote repository: artifactory")
+        return
+
     sdk_ctx.runner.run(["conan", "remove", name, "-c"], cwd=sdk_ctx.project_dir)
     print(f"Package {name} removed from local cache")
 
@@ -417,13 +423,19 @@ def register(registry: CommandRegistry) -> None:
     registry.command(
         path="sf-pkg/remove",
         callback=remove_callback,
-        help="Remove package from local cache.",
+        help="Remove package from local cache or from remote artifactory.",
         options=[
             {
                 "names": ["--name"],
                 "help": "Name of package to be removed.",
                 "required": True,
-            }
+            },
+            {
+                "names": ["--remote"],
+                "help": "Remove package from remote artifactory instead of local cache.",
+                "is_flag": True,
+                "default": False,
+            },
         ],
     )
 

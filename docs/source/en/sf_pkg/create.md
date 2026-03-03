@@ -186,11 +186,16 @@ Command format explanation:
    ```bash
    sdk.py sf-pkg-remove --name <package_name>
    ```
-2. Rebuild:
+2. (Optional) Remove the package from the remote repository:
+   ```bash
+   sdk.py sf-pkg-remove --name <package_name>/<version>@<username> --remote
+   ```
+   Note: `--remote` removes the package from remote `artifactory`. Please login first.
+3. Rebuild:
    ```bash
    sdk.py sf-pkg-build --version <version_number>
    ```
-3. Upload again:
+4. Upload again:
    ```bash
    sdk.py sf-pkg-upload --name <package_name>/<version>@<username>
    ```
