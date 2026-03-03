@@ -197,7 +197,7 @@ def _warn_relogin(reason: str, backups: List[str]) -> None:
     backup_msg = f' Backups: {", ".join(backups)}.' if backups else ''
     print_warning(
         f'WARNING: {reason}. Local sf-pkg credentials were reset.{backup_msg} '
-        'Please login again using "sdk.py sf-pkg-login".'
+        'Please login again using "sdk.py sf-pkg login".'
     )
 
 
@@ -408,8 +408,8 @@ def resolve_credentials(cli_user: Optional[str], required: bool=True) -> Optiona
     if not selected_user:
         if required:
             raise SfPkgAuthError(
-                'No sf-pkg user selected. Login first with "sdk.py sf-pkg-login -u <user> -t <token>" '
-                'or pass global "--user <user>".'
+                'No sf-pkg user selected. Login first with "sdk.py sf-pkg login -u <user> -t <token>" '
+                'or pass group "--user <user>" to "sdk.py sf-pkg ...".'
             )
         return None
 
@@ -417,7 +417,7 @@ def resolve_credentials(cli_user: Optional[str], required: bool=True) -> Optiona
     if not record:
         raise SfPkgAuthError(
             f'User "{selected_user}" is not logged in locally. '
-            'Please run "sdk.py sf-pkg-login -u <user> -t <token>".'
+            'Please run "sdk.py sf-pkg login -u <user> -t <token>".'
         )
 
     token = record.get('token', '').strip()
