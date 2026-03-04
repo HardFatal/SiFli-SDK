@@ -16,5 +16,10 @@ HAL_RAM_RET_CODE_SECT(HAL_MspInit,  __weak void HAL_MspInit(void))
     BSP_IO_Init();
 }
 
+__weak void BSP_SD2_PowerUp(void)
+{
+    // Default implementation - can be overridden by board-specific implementation
+}
+
 #endif /* BSP_USING_PC_SIMULATOR */
 

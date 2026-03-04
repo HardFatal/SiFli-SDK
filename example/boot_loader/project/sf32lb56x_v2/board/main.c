@@ -141,10 +141,16 @@ void boot_images_help()
                 extern void board_init_psram();
                 board_init_psram();
 #ifdef SD_BL_MODE
-                extern uint32_t init_sdnand();
+
+#if defined(BOOT_DEVICE_SDMMC1)
                 init_sdnand();
+#elif defined(BOOT_DEVICE_SDMMC2)
+                init_sdemmc2();
 #endif
+
+#endif /* SD_BL_MODE*/
             }
+
             dfu_boot_img_in_flash(flash_id);
         }
     }

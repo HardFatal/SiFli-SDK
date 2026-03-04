@@ -127,7 +127,10 @@ int BSP_Flash_Init(void);
  */
 void BSP_SD_PowerUp(void);
 
+void BSP_SD2_PowerUp(void);
+
 void BSP_GPIO_Set(int pin, int val, int is_porta);
+
 
 /**
  * @brief PSRAM
