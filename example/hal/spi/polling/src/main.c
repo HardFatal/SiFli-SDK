@@ -1,35 +1,45 @@
 #include "rtconfig.h"
 #include "bf0_hal.h"
 #include "drv_io.h"
-#include "stdio.h"
 #include "string.h"
 #include "rtthread.h"
 
 static SPI_HandleTypeDef spi_Handle = {0};
-#define     SPI_MODE    0
-static void gpio_set(uint16_t pin)
+#define SPI_MODE 0
+#define SPI_LOOPBACK_LEN 16
+
+static void spi_prepare_tx_pattern(uint8_t *tx_buf, uint32_t len, uint8_t seed)
 {
-    GPIO_InitTypeDef GPIO_InitStruct;
+    uint32_t i;
 
-    HAL_PIN_Set(PAD_PB00 + pin, GPIO_B0 + pin, PIN_PULLDOWN, 0);
-    GPIO_InitStruct.Pin = pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(hwp_gpio2, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(hwp_gpio2, pin, 1);
+    for (i = 0; i < len; i++)
+    {
+        tx_buf[i] = (uint8_t)(seed + i);
+    }
 }
 
-void spi_config(void)
+static uint32_t spi_count_mismatch(const uint8_t *tx_buf, const uint8_t *rx_buf, uint32_t len)
 {
+    uint32_t i;
+    uint32_t mismatch = 0;
 
+    for (i = 0; i < len; i++)
+    {
+        if (tx_buf[i] != rx_buf[i])
+        {
+            mismatch++;
+        }
+    }
+
+    return mismatch;
 }
+
 static void spi_test(void)
 {
     uint32_t baundRate = 20000000; //hz
-    uint8_t cmd[16] = {0};   //SPI_DATASIZE_8BIT
-    uint8_t read_data[16] = {0};
-    uint8_t pid = 0;
+    uint8_t tx_data[SPI_LOOPBACK_LEN] = {0};
+    uint8_t rx_data[SPI_LOOPBACK_LEN] = {0};
+    uint32_t round = 0;
     HAL_StatusTypeDef ret;
 
     //----------------------------------------------
@@ -48,8 +58,6 @@ static void spi_test(void)
 #endif
     /* 2, open spi1 clock source  */
     HAL_RCC_EnableModule(RCC_MOD_SPI1);
-
-    //gpio_set(30);
 
     //----------------------------------------------
     // 2. spi init
@@ -103,26 +111,36 @@ static void spi_test(void)
     }
 
     //----------------------------------------------
-    // 3.1. spi sync rtx
-    cmd[0] = 0xff;
-    ret = HAL_SPI_Transmit(&spi_Handle, (uint8_t *)cmd, 1, 1000);
-    cmd[0] = 0x9f;
-    __HAL_SPI_TAKE_CS(&spi_Handle);
-    ret = HAL_SPI_TransmitReceive(&spi_Handle, (uint8_t *)&cmd, (uint8_t *)&read_data, 16, 1000);
-    __HAL_SPI_RELEASE_CS(&spi_Handle);
-    HAL_Delay_us(5);
-    __HAL_SPI_TAKE_CS(&spi_Handle);
-    ret = HAL_SPI_Transmit(&spi_Handle, (uint8_t *)cmd, 1, 1000);
-    ret = HAL_SPI_Receive(&spi_Handle, (uint8_t *)read_data, 16, 1000);
-    __HAL_SPI_RELEASE_CS(&spi_Handle);
+    // 3. polling loopback test
+    rt_kprintf("tip: short SPI1 MOSI(DIO/DO) to MISO(DI) for loopback verification.\n");
 
-    rt_kprintf("ret:%d,spi read:", ret);
-    for (uint8_t i = 0; i < 16; i++)
+    while (1)
     {
-        rt_kprintf("0x%x,", read_data[i]);
-    }
-    rt_kprintf("\n");
+        uint32_t mismatch;
+        uint8_t i;
 
+        spi_prepare_tx_pattern(tx_data, SPI_LOOPBACK_LEN, (uint8_t)round);
+        memset(rx_data, 0, sizeof(rx_data));
+
+        ret = HAL_SPI_TransmitReceive(&spi_Handle, tx_data, rx_data, SPI_LOOPBACK_LEN, 1000);
+        mismatch = spi_count_mismatch(tx_data, rx_data, SPI_LOOPBACK_LEN);
+
+        rt_kprintf("round=%lu ret=%d mismatch=%lu tx:", (unsigned long)round, ret, (unsigned long)mismatch);
+        for (i = 0; i < SPI_LOOPBACK_LEN; i++)
+        {
+            rt_kprintf(" %02x", tx_data[i]);
+        }
+
+        rt_kprintf(" rx:");
+        for (i = 0; i < SPI_LOOPBACK_LEN; i++)
+        {
+            rt_kprintf(" %02x", rx_data[i]);
+        }
+        rt_kprintf("\n");
+
+        round++;
+        rt_thread_mdelay(500);
+    }
 }
 
 /**
@@ -132,13 +150,9 @@ static void spi_test(void)
   */
 int main(void)
 {
-    HAL_StatusTypeDef  ret = HAL_OK;
-
     /* Output a message on console using printf function */
-    rt_kprintf("Start spi demo!\n");
+    rt_kprintf("Start spi polling loopback demo!\n");
     spi_test();
-    rt_kprintf("spi demo end!\n");
-    while (1);
+
     return 0;
 }
-
