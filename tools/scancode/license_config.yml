@@ -54,6 +54,8 @@ extensions:
       - "filesystems/dhara/dhara"
       - "external/lvgl_v8"
       - "external/lvgl_v9"
+      - "example/multimedia/lvgl/lvgl_v9_examples"
+      - "example/multimedia/lvgl/lvgl_v9_demos"
       - "external/cherryusb"
       - "tools/mkfatimg/mkfatimg"
     ignore_license: true
