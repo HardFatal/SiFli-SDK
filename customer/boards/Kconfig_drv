@@ -175,6 +175,10 @@ menu "On-chip Peripheral RTOS Drivers"
         default n
         select RT_USING_SPI
         if BSP_USING_SPI
+            config BSP_USING_SPI_DMA_CIRCULAR
+                bool "Enable SPI DMA CIRCULAR"
+                default n
+
             config BSP_USING_SPI1
                 bool "Enable SPI1 BUS"
                 default n
