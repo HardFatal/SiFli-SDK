@@ -101,8 +101,12 @@ typedef struct
     coredump_type_t type;
     /** Current coredump state */
     coredump_state_t state;
-    /** Pointer to backend implementation */
-    const coredump_backend_t *backend;
+    /** Pointer to fulldump backend */
+    const coredump_backend_t *fulldump_backend;
+    /** Pointer to minidump backend */
+    const coredump_backend_t *minidump_backend;
+    /** pointer to current working backend */
+    const coredump_backend_t *curr_backend;
     /** Coredump enable/disable flag */
     uint8_t enabled_flag;
     /** Log position for hcpu log dump */
@@ -184,52 +188,47 @@ __WEAK const coredump_register_region_t coredump_register_list[] =
 
 static void coredump_sync(void)
 {
-    if (coredump_ctx.backend && coredump_ctx.backend->sync)
+    if (coredump_ctx.curr_backend && coredump_ctx.curr_backend->sync)
     {
-        coredump_ctx.backend->sync();
+        coredump_ctx.curr_backend->sync();
     }
 }
 
 static int32_t coredump_query(coredump_query_id_t id, void *arg)
 {
-    return coredump_ctx.backend->query(id, arg);
+    return coredump_ctx.curr_backend->query(id, arg);
 }
 
 static coredump_err_code_t coredump_start(void)
 {
-    return coredump_ctx.backend->start();
+    return coredump_ctx.curr_backend->start();
 }
 
 static void coredump_end(void)
 {
-    coredump_ctx.backend->end();
+    coredump_ctx.curr_backend->end();
 }
 
-static coredump_err_code_t coredump_set_backend(coredump_type_t coredump_type)
+static coredump_err_code_t coredump_set_mode(coredump_type_t coredump_type)
 {
     if (coredump_type == COREDUMP_TYPE_FULL)
     {
-#ifdef COREDUMP_BACKEND_PARTITION
-        coredump_ctx.backend = &coredump_backend_partition;
-#elif defined(COREDUMP_BACKEND_FILE)
-        coredump_ctx.backend = &coredump_backend_file;
-#else
-#error "Please select a backend for core dump"
-#endif /* COREDUMP_BACKEND_PARTITION */
+        coredump_ctx.curr_backend = coredump_ctx.fulldump_backend;
     }
 #ifdef COREDUMP_MINIDUMP_ENABLED
     else
     {
-        coredump_ctx.backend = &coredump_backend_partition;
+        coredump_ctx.curr_backend = coredump_ctx.minidump_backend;;
     }
 #endif /* COREDUMP_MINIDUMP_ENABLED */
 
-    return coredump_ctx.backend->init(coredump_type);
+    return coredump_ctx.curr_backend->set_mode(coredump_type);
 }
+
 
 size_t coredump_raw_write(uint8_t *buf, size_t len)
 {
-    return coredump_ctx.backend->write(buf, len);
+    return coredump_ctx.curr_backend->write(buf, len);
 }
 
 void coredump_block_prepare(uint32_t addr, size_t len, coredump_block_header_t *block_header)
@@ -239,7 +238,7 @@ void coredump_block_prepare(uint32_t addr, size_t len, coredump_block_header_t *
 
     block_header->addr = addr;
     block_header->len = len;
-    remain_size = coredump_ctx.backend->query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
+    remain_size = coredump_ctx.curr_backend->query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
     if (remain_size <= sizeof(block_header))
     {
         block_header->len = 0;
@@ -972,7 +971,7 @@ void coredump(void)
 
     coredump_ctx.type = COREDUMP_TYPE_FULL;
     coredump_ctx.state = COREDUMP_STATE_BUSY;
-    r = coredump_set_backend(COREDUMP_TYPE_FULL);
+    r = coredump_set_mode(COREDUMP_TYPE_FULL);
     if (r != COREDUMP_ERR_NO)
     {
         COREDUMP_RECORD_STEP(RECORD_CRASH_SAVE_ERR);
@@ -1035,7 +1034,7 @@ void coredump_minimum(void)
 
     coredump_ctx.type = COREDUMP_TYPE_MINIMUM;
     coredump_ctx.state = COREDUMP_STATE_BUSY;
-    r = coredump_set_backend(COREDUMP_TYPE_MINIMUM);
+    r = coredump_set_mode(COREDUMP_TYPE_MINIMUM);
     if (r != COREDUMP_ERR_NO)
     {
         COREDUMP_RECORD_STEP(RECORD_CRASH_SAVE_ERR);
@@ -1118,14 +1117,14 @@ int coredump_set_onoff(int flag)
 
 int coredump_clear(void)
 {
-    coredump_ctx.backend->clear();
+    coredump_ctx.curr_backend->clear();
 
     return 0;
 }
 
 int coredump_get_type(void)
 {
-    if (coredump_ctx.backend == &coredump_backend_partition)
+    if (coredump_ctx.curr_backend == &coredump_backend_partition)
     {
         return 0;
     }
@@ -1141,10 +1140,14 @@ coredump_err_code_t coredump_get_data(coredump_data_t *data)
 
     RT_ASSERT(data);
 
-    data->is_file = (coredump_ctx.backend == &coredump_backend_file) ? true : false;
+#ifdef COREDUMP_BACKEND_FILE
+    data->is_file = true;
+#else
+    data->is_file = false;
+#endif /* COREDUMP_BACKEND_FILE */
 
 #ifdef COREDUMP_MINIDUMP_ENABLED
-    r = coredump_set_backend(COREDUMP_TYPE_MINIMUM);
+    r = coredump_set_mode(COREDUMP_TYPE_MINIMUM);
     RT_ASSERT(COREDUMP_ERR_NO == r);
     r = coredump_query(COREDUMP_QUERY_DATA_PRESENT, NULL);
     if (r > 0)
@@ -1165,7 +1168,7 @@ coredump_err_code_t coredump_get_data(coredump_data_t *data)
 #endif /* COREDUMP_MINIDUMP_ENABLED */
 
 
-    r = coredump_set_backend(COREDUMP_TYPE_FULL);
+    r = coredump_set_mode(COREDUMP_TYPE_FULL);
     RT_ASSERT(COREDUMP_ERR_NO == r);
 #ifndef COREDUMP_MINIDUMP_ENABLED
     r = coredump_query(COREDUMP_QUERY_DATA_PRESENT, NULL);
@@ -1187,16 +1190,42 @@ coredump_err_code_t coredump_get_data(coredump_data_t *data)
     }
 
     return COREDUMP_ERR_NO;
+}
+
+size_t coredump_read_minidump(uint32_t offset, uint8_t *buf, size_t len)
+{
+#ifdef COREDUMP_MINIDUMP_ENABLED
+    const coredump_backend_t *backend = coredump_ctx.minidump_backend;
+    coredump_err_code_t err;
+    size_t rd_size;
+
+    RT_ASSERT(backend && backend->set_mode && backend->read);
+
+    err = backend->set_mode(COREDUMP_TYPE_MINIMUM);
+    RT_ASSERT(COREDUMP_ERR_NO == err);
+
+    rd_size = backend->read(offset, buf, len);
+
+    err = backend->set_mode(COREDUMP_TYPE_FULL);
+    RT_ASSERT(COREDUMP_ERR_NO == err);
+
+    return rd_size;
+
+#else
+    return 0;
+#endif /* COREDUMP_MINIDUMP_ENABLED */
+
 
 }
 
+
 static int coredump_init(void)
 {
-    coredump_type_t coredump_type;
     coredump_err_code_t r;
 
 #ifdef COREDUMP_MINIDUMP_ENABLED
-    r = coredump_set_backend(COREDUMP_TYPE_MINIMUM);
+    coredump_ctx.minidump_backend = &coredump_backend_partition;
+    r = coredump_ctx.minidump_backend->init(COREDUMP_TYPE_MINIMUM);
     if (COREDUMP_ERR_NO != r)
     {
         rt_kprintf("Coredump backend init failed for minimum dump, err code: %d\n", r);
@@ -1204,12 +1233,22 @@ static int coredump_init(void)
     }
 #endif /* COREDUMP_MINIDUMP_ENABLED */
 
-    r = coredump_set_backend(COREDUMP_TYPE_FULL);
+#ifdef COREDUMP_BACKEND_PARTITION
+    coredump_ctx.fulldump_backend = &coredump_backend_partition;
+#elif defined(COREDUMP_BACKEND_FILE)
+    coredump_ctx.fulldump_backend = &coredump_backend_file;
+#else
+#error "Please select a backend for core dump"
+#endif /* COREDUMP_BACKEND_PARTITION */
+
+    r = coredump_ctx.fulldump_backend->init(COREDUMP_TYPE_FULL);
     if (COREDUMP_ERR_NO != r)
     {
         rt_kprintf("Coredump backend init failed for full dump, err code: %d\n", r);
         RT_ASSERT(0);
     }
+
+    coredump_set_mode(COREDUMP_TYPE_FULL);
 
     coredump_ctx.enabled_flag = 1;
 

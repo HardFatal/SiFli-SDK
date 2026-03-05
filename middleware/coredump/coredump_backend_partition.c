@@ -19,8 +19,6 @@
 #define COREDUMP_CACHE_BUF_SIZE (4096)
 
 typedef size_t (*coredump_backend_erase_t)(uint32_t offset, size_t len);
-typedef size_t (*coredump_backend_read_t)(uint32_t offset, uint8_t *buf, size_t len);
-
 typedef struct
 {
     /** rt device, such as SPI flash, SDMMC, etc. */
@@ -45,13 +43,20 @@ typedef struct
     coredump_backend_state_t state;
 } coredump_backend_partition_ctx_t;
 
-static coredump_backend_partition_ctx_t partition_backend_ctx;
+
+static coredump_backend_partition_ctx_t fulldump_partition_backend_ctx;
+
+#ifdef COREDUMP_MINIDUMP_ENABLED
+    static coredump_backend_partition_ctx_t minidump_partition_backend_ctx;
+#endif /* COREDUMP_MINIDUMP_ENABLED */
+static coredump_backend_partition_ctx_t *partition_backend_ctx = &fulldump_partition_backend_ctx;
 static uint8_t partition_cache_buf[COREDUMP_CACHE_BUF_SIZE];
+
 
 #ifdef BSP_USING_SPI_FLASH
 static size_t coredump_nor_write(uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
     uint32_t remain_size;
     uint32_t wr_len;
     uint32_t r;
@@ -84,7 +89,7 @@ static size_t coredump_nor_write(uint8_t *buf, size_t len)
 
 static size_t coredump_nor_erase(uint32_t offset, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if ((offset + len) > ctx->total_size)
     {
@@ -103,7 +108,7 @@ static size_t coredump_nor_erase(uint32_t offset, size_t len)
 
 static size_t coredump_nor_read(uint32_t offset, uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if ((offset + len) > ctx->total_size)
     {
@@ -116,14 +121,14 @@ static size_t coredump_nor_read(uint32_t offset, uint8_t *buf, size_t len)
 
 static size_t coredump_nand_write(uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     return rt_nand_write(ctx->start_addr + ctx->wr_pos, buf, len);
 }
 
 static size_t coredump_nand_erase(uint32_t offset, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if ((offset + len) > ctx->total_size)
     {
@@ -142,7 +147,7 @@ static size_t coredump_nand_erase(uint32_t offset, size_t len)
 
 static size_t coredump_nand_read(uint32_t offset, uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if ((offset + len) > ctx->total_size)
     {
@@ -155,7 +160,7 @@ static size_t coredump_nand_read(uint32_t offset, uint8_t *buf, size_t len)
 
 static size_t coredump_sdmmc_write(uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
     rt_off_t    pos;
     rt_size_t   size;
 
@@ -166,7 +171,7 @@ static size_t coredump_sdmmc_write(uint8_t *buf, size_t len)
 
 static size_t coredump_sdmmc_read(uint32_t offset, uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
     rt_off_t    pos;
     rt_size_t   size;
 
@@ -201,17 +206,13 @@ static coredump_err_code_t coredump_backend_partition_init(coredump_type_t cored
     const struct fal_partition *fal_part;
     const struct fal_flash_dev *fal_dev;
     uint32_t erase_size;
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
-
-    if (COREDUMP_BACKEND_STATE_BUSY == ctx->state)
-    {
-        return COREDUMP_ERR_BUSY;
-    }
+    coredump_backend_partition_ctx_t *ctx;
 
     if (COREDUMP_TYPE_MINIMUM == coredump_type)
     {
 #ifdef COREDUMP_MINIDUMP_ENABLED
         part_name = COREDUMP_MINIDUMP_PART_NAME;
+        ctx = &minidump_partition_backend_ctx;
 #else
         return COREDUMP_ERR_INVALID_PARAM;
 #endif /* COREDUMP_MINIDUMP_ENABLED */
@@ -220,10 +221,17 @@ static coredump_err_code_t coredump_backend_partition_init(coredump_type_t cored
     {
 #ifdef COREDUMP_BACKEND_PARTITION
         part_name = COREDUMP_PARTITION_NAME;
+        ctx = &fulldump_partition_backend_ctx;
 #else
         return COREDUMP_ERR_INVALID_PARAM;
 #endif /* COREDUMP_BACKEND_PARTITION */
     }
+
+    if (COREDUMP_BACKEND_STATE_BUSY == ctx->state)
+    {
+        return COREDUMP_ERR_BUSY;
+    }
+
     memset((void *)ctx, 0, sizeof(*ctx));
     coredump_get_part_and_dev(part_name, &fal_part, &fal_dev);
     if (!fal_part || !fal_dev)
@@ -285,7 +293,7 @@ static coredump_err_code_t coredump_backend_partition_init(coredump_type_t cored
 static coredump_err_code_t coredump_backend_partition_start(void)
 {
     uint32_t erase_size;
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if (COREDUMP_BACKEND_STATE_INVALID == ctx->state)
     {
@@ -295,8 +303,6 @@ static coredump_err_code_t coredump_backend_partition_start(void)
     {
         return COREDUMP_ERR_BUSY;
     }
-
-    // HAL_sw_breakpoint();
 
     if (ctx->erase)
     {
@@ -322,7 +328,7 @@ static coredump_err_code_t coredump_backend_partition_start(void)
 
 static void coredump_backend_partition_end(void)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if (ctx->cache_buf && (ctx->cache_data_size > 0))
     {
@@ -334,7 +340,7 @@ static void coredump_backend_partition_end(void)
 
 static size_t coredump_backend_partition_write(uint8_t *buf, size_t len)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
     size_t remaining_size;
     size_t total_written = 0;
     uint16_t copy_len;
@@ -427,10 +433,22 @@ static size_t coredump_backend_partition_write(uint8_t *buf, size_t len)
     return total_written;
 }
 
+static size_t coredump_backend_partition_read(uint32_t offset, uint8_t *buf, size_t len)
+{
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
+
+    if (ctx->state != COREDUMP_BACKEND_STATE_IDLE)
+    {
+        return 0;
+    }
+
+    return ctx->read(offset, buf, len);
+}
+
 static int32_t coredump_backend_partition_query(coredump_query_id_t id, void *arg)
 {
     int32_t r;
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     switch (id)
     {
@@ -520,7 +538,7 @@ static int32_t coredump_backend_partition_query(coredump_query_id_t id, void *ar
 
 static coredump_err_code_t coredump_backend_partition_clear(void)
 {
-    coredump_backend_partition_ctx_t *ctx = &partition_backend_ctx;
+    coredump_backend_partition_ctx_t *ctx = partition_backend_ctx;
 
     if (COREDUMP_BACKEND_STATE_IDLE != ctx->state)
     {
@@ -538,6 +556,43 @@ static coredump_err_code_t coredump_backend_partition_clear(void)
     return COREDUMP_ERR_NO;
 }
 
+coredump_err_code_t coredump_backend_partition_set_mode(coredump_type_t coredump_type)
+{
+    coredump_err_code_t r;
+
+    r = COREDUMP_ERR_NO;
+    if (COREDUMP_TYPE_FULL == coredump_type)
+    {
+        if (COREDUMP_BACKEND_STATE_IDLE != fulldump_partition_backend_ctx.state)
+        {
+            r = COREDUMP_ERR_BACKEND_NOT_READY;
+        }
+        else
+        {
+            partition_backend_ctx = &fulldump_partition_backend_ctx;
+        }
+    }
+#ifdef COREDUMP_MINIDUMP_ENABLED
+    else if (COREDUMP_TYPE_MINIMUM == coredump_type)
+    {
+        if (COREDUMP_BACKEND_STATE_IDLE != minidump_partition_backend_ctx.state)
+        {
+            r = COREDUMP_ERR_BACKEND_NOT_READY;
+        }
+        else
+        {
+            partition_backend_ctx = &minidump_partition_backend_ctx;
+        }
+    }
+#endif /* COREDUMP_MINIDUMP_ENABLED */
+    else
+    {
+        r = COREDUMP_ERR_INVALID_PARAM;
+    }
+
+    return r;
+}
+
 const coredump_backend_t coredump_backend_partition =
 {
     .init = coredump_backend_partition_init,
@@ -545,6 +600,8 @@ const coredump_backend_t coredump_backend_partition =
     .end = coredump_backend_partition_end,
     .write = coredump_backend_partition_write,
     .query = coredump_backend_partition_query,
-    .clear = coredump_backend_partition_clear
+    .clear = coredump_backend_partition_clear,
+    .read = coredump_backend_partition_read,
+    .set_mode = coredump_backend_partition_set_mode
 };
 

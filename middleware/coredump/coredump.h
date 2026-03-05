@@ -159,11 +159,23 @@ typedef void (*coredump_backend_end_t)(void);
  *
  * Writes buffer data to the backend.
  *
- * @param buf Pointer to the data buffer to write
- * @param len Length of data to write in bytes
+ * @param[in] buf Pointer to the data buffer to write
+ * @param[in] len Length of data to write in bytes
  * @return size_t Number of bytes written
  */
 typedef size_t (*coredump_backend_write_t)(uint8_t *buf, size_t len);
+
+/**
+ * @brief Backend read function pointer
+ *
+ * Reads data from the backend.
+ *
+ * @param[in] offset Offset from where to start reading
+ * @param[out] buf Pointer to the data buffer to read into
+ * @param[in] len Length of data to read in bytes
+ * @return size_t Number of bytes read
+ */
+typedef size_t (*coredump_backend_read_t)(uint32_t offset, uint8_t *buf, size_t len);
 
 /**
  * @brief Backend clear function pointer
@@ -194,6 +206,15 @@ typedef int32_t (*coredump_backend_query_t)(coredump_query_id_t id, void *arg);
 typedef void (*coredump_backend_sync_t)(void);
 
 /**
+ * @brief Set backend work mode, fulldump or minidump
+ *
+ * @param coredump_type Type of coredump (COREDUMP_TYPE_MINIMUM or COREDUMP_TYPE_FULL)
+ * @return coredump_err_code_t Error code, COREDUMP_ERR_NO indicates success
+ */
+typedef coredump_err_code_t (*coredump_backend_set_mode_t)(coredump_type_t coredump_type);
+
+
+/**
  * @brief Coredump backend structure
  *
  * Contains all function pointers for backend operations.
@@ -214,6 +235,11 @@ typedef struct
     coredump_backend_sync_t     sync;
     /** clear the backend for the core dump */
     coredump_backend_clear_t    clear;
+    /** read dump data from backend according to current work mode */
+    coredump_backend_read_t    read;
+    /** set backend work mode, minidump or fulldump */
+    coredump_backend_set_mode_t   set_mode;
+
 } coredump_backend_t;
 
 /** Partition-based backend for coredump storage */
@@ -248,6 +274,18 @@ void coredump_ext(void);
  * @return None
  */
 void coredump_minimum(void);
+
+/**
+ * @brief Read minidump data from backend
+ *
+ * Reads minidump data from the backend at the specified offset into the provided buffer.
+ *
+ * @param[in] offset Offset from the start of minidump data to begin reading
+ * @param[out] buf Pointer to the buffer to store read data
+ * @param[in] len Number of bytes to read
+ * @return size_t Number of bytes actually read
+ */
+size_t coredump_read_minidump(uint32_t offset, uint8_t *buf, size_t len);
 
 /**
  * @brief Get coredump data information from backend

@@ -257,6 +257,18 @@ static coredump_err_code_t coredump_backend_file_clear(void)
     return COREDUMP_ERR_NO;
 }
 
+coredump_err_code_t coredump_backend_file_set_mode(coredump_type_t coredump_type)
+{
+    if (COREDUMP_TYPE_FULL == coredump_type)
+    {
+        return COREDUMP_ERR_NO;
+    }
+    else
+    {
+        return COREDUMP_ERR_INVALID_PARAM;
+    }
+}
+
 const coredump_backend_t coredump_backend_file =
 {
     .init = coredump_backend_file_init,
@@ -264,5 +276,7 @@ const coredump_backend_t coredump_backend_file =
     .end = coredump_backend_file_end,
     .write = coredump_backend_file_write,
     .query = coredump_backend_file_query,
-    .sync = coredump_backend_file_sync
+    .sync = coredump_backend_file_sync,
+    .clear = coredump_backend_file_clear,
+    .set_mode = coredump_backend_file_set_mode
 };
