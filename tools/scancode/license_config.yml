@@ -51,15 +51,11 @@ extensions:
       - GPL-2.0-only
       - GPL-2.0-or-later
   - path:
-      "filesystems/dhara/dhara"
-    ignore_license: true
-    ignore_copyright: true
-  - path:
-      "external/lvgl_v8"
-    ignore_license: true
-    ignore_copyright: true
-  - path:
-      "external/lvgl_v9"
+      - "filesystems/dhara/dhara"
+      - "external/lvgl_v8"
+      - "external/lvgl_v9"
+      - "external/cherryusb"
+      - "tools/mkfatimg/mkfatimg"
     ignore_license: true
     ignore_copyright: true
   - path:
@@ -67,10 +63,5 @@ extensions:
     license:
       - RCSL-1.2
       - RPSL-1.0
-  - path:
-      "tools/mkfatimg/mkfatimg"
-    ignore_license: true
-  - path:
-      "external/cherryusb"
-    ignore_license: true
-    ignore_copyright: true
+
+

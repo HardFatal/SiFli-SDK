@@ -9,6 +9,16 @@ import json
 import yaml
 import fnmatch
 
+
+def normalize_rule_paths(rule):
+    paths = rule.get("path")
+    if not paths:
+        return []
+    if isinstance(paths, list):
+        return paths
+    return [paths]
+
+
 def analyze_file(config_file, scancode_file, scanned_files_dir):
 
     with open(config_file, 'r') as f:
@@ -35,8 +45,10 @@ def analyze_file(config_file, scancode_file, scanned_files_dir):
     report_unknown_license = lic_config.get("report_unknown", False)
     report_missing_license = lic_config.get("report_missing", False)
     extensions_config = config.get("extensions", [])
-    extension_paths = [rule.get("path") for rule in extensions_config if rule.get("path")]
-    extension_rules = {rule.get("path"): rule for rule in extensions_config if rule.get("path")}
+    extension_rules = []
+    for rule in extensions_config:
+        for path in normalize_rule_paths(rule):
+            extension_rules.append((path, rule))
     # more_cat = []
     # more_cat.append(lic_cat)
     more_lic = lic_config.get('additional', [])
@@ -85,12 +97,11 @@ def analyze_file(config_file, scancode_file, scanned_files_dir):
 
 
             if check:
-                matched_ext_paths = [p for p in extension_paths if p in orig_path]
+                matched_rules = [(path, rule) for path, rule in extension_rules if path in orig_path]
                 matched_rule = {}
-                if matched_ext_paths:
+                if matched_rules:
                     # Use the longest match to avoid less-specific parent paths winning.
-                    matched_path = max(matched_ext_paths, key=len)
-                    matched_rule = extension_rules.get(matched_path, {})
+                    matched_path, matched_rule = max(matched_rules, key=lambda item: len(item[0]))
 
                 ignore_license = matched_rule.get("ignore_license", False)
                 ignore_copyright = matched_rule.get("ignore_copyright", False)
