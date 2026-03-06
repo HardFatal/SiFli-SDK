@@ -641,6 +641,15 @@ static void media_read_thread(void *p)
             thiz->frame_index = 0;
             while (thiz->seeking_state == 1)
             {
+                if (thiz->audio_dec_ctx && !thiz->video_dec_ctx)
+                {
+                    av_seek_frame(thiz->fmt_ctx, -1, AV_TIME_BASE * thiz->seek_to_second, AVSEEK_FLAG_BACKWARD);
+                    avcodec_flush_buffers(thiz->fmt_ctx);
+                    thiz->seeking_state = 0;
+                    thiz->audio_played_ms = thiz->seek_to_second * 1000;
+                    break;
+                }
+
                 read_ret = av_read_frame(thiz->fmt_ctx, &pkt);
                 if (read_ret < 0)
                 {
@@ -648,12 +657,25 @@ static void media_read_thread(void *p)
                     thiz->seeking_state = 0;
                     break;
                 }
-                if (pkt.stream_index == thiz->video_stream_idx)
+                if (thiz->video_dec_ctx)
                 {
-                    thiz->frame_index++;
-                    if (thiz->frame_index * thiz->period_float / 1000 >= thiz->seek_to_second)
+                    if (pkt.stream_index == thiz->video_stream_idx)
                     {
-                        thiz->seeking_state = 2;
+                        thiz->frame_index++;
+                        if (thiz->frame_index * thiz->period_float / 1000 >= thiz->seek_to_second)
+                        {
+                            thiz->seeking_state = 2;
+                        }
+                    }
+                }
+                else if (thiz->audio_dec_ctx)
+                {
+                    LOG_I("audio only index=%d, time=%d", thiz->frame_index, pkt.pts / AV_TIME_BASE);
+                    thiz->frame_index++;
+
+                    if (pkt.pts / AV_TIME_BASE >= thiz->seek_to_second)
+                    {
+                        thiz->seeking_state = 0;
                     }
                 }
                 AVPacket orig_pkt = pkt;
@@ -688,6 +710,7 @@ static void media_read_thread(void *p)
                         av_seek_frame(thiz->fmt_ctx, 0, 0, AVSEEK_FLAG_BACKWARD);
                         thiz->frame_index = 0;
                         thiz->last_seconds = -1;
+                        thiz->audio_played_ms = 0;
                         thiz->cfg.notify(thiz->user_data, e_ffmpeg_play_to_loop, 0);
                         continue;
                     }
@@ -751,6 +774,7 @@ static void media_read_thread(void *p)
                         thiz->last_seconds = seconds;
                         thiz->cfg.notify(thiz->user_data, e_ffmpeg_progress, seconds);
                     }
+                    thiz->cfg.notify(thiz->user_data, e_ffmpeg_play_frames, thiz->frame_index);
                 }
                 thiz->frame_index++;
             }
@@ -1140,7 +1164,11 @@ static int mediaplayer_start(ffmpeg_handle thiz, bool is_file)
         thiz->audio_dec_ctx = audio_stream->codec;
         thiz->audio_channel = thiz->audio_dec_ctx->channels;
         thiz->audio_samplerate = thiz->audio_dec_ctx->sample_rate;
-        stream_find = 1;
+        if (!stream_find)
+        {
+            thiz->total_time_in_seconds = thiz->fmt_ctx->duration / AV_TIME_BASE;
+            stream_find = 1;
+        }
         LOG_I("audio codec: fmt=%d", thiz->audio_dec_ctx->sample_fmt);
     }
     else
@@ -1453,6 +1481,7 @@ static void ezip_read_thread(void *p)
                         uint32_t sec;
                         sec = thiz->frame_index * thiz->period_float / 1000;
                         thiz->frame_index++;
+                        thiz->cfg.notify(thiz->user_data, e_ffmpeg_play_frames, thiz->frame_index);
                         if (sec >= thiz->seek_to_second)
                         {
                             thiz->last_seconds = sec;
@@ -2134,6 +2163,39 @@ int ffmpeg_get_video_info(ffmpeg_handle thiz, uint32_t *video_width, uint32_t *v
         return 0;
     }
     return -RT_EEMPTY;
+}
+
+int ffmpeg_get_ezip_info(const char *filename, uint32_t *w, uint32_t *h, uint32_t *max_size)
+{
+    int err = RT_ERROR;
+    ezip_media_t ezip_header = {0};
+    LOG_I("%s: filename %s", __func__, filename);
+    int fd = open(filename, O_RDONLY | O_BINARY);
+    if (fd < 0)
+        return err;
+    read(fd, &ezip_header, 8);
+    if (!memcmp(SIFLI_MEDIA_MAGIC1, ezip_header.header, 8))
+    {
+        read(fd, &ezip_header.duration_seconds, sizeof(ezip_header) - 8 - 4); //old tools no max_frame_size
+    }
+    else if (!memcmp(SIFLI_MEDIA_MAGIC2, ezip_header.header, 8))
+    {
+        read(fd, &ezip_header.max_frame_size, sizeof(ezip_header) - 8);
+    }
+    else
+    {
+        close(fd);
+        return err;
+    }
+
+    *w = ezip_header.width;
+    *h = ezip_header.height;
+
+    *max_size = ezip_header.max_frame_size;
+
+    close(fd);
+
+    return RT_EOK;
 }
 
 void ffmpeg_pause(ffmpeg_handle thiz)

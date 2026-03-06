@@ -125,6 +125,7 @@ typedef enum
     e_ffmpeg_progress, //val is seconds
     e_ffmpeg_play_to_error, //read frame error
     e_ffmpeg_play_to_loop,  //loop again
+    e_ffmpeg_play_frames,  //val is current frames
 } ffmpeg_cmd_e;
 
 typedef struct
@@ -281,6 +282,12 @@ uint8_t *ffmpeg_get_first_ezip_in_nand(const char *nand_address, uint32_t nand_s
  * @return 0 if successful, negative errno code if failure.
  */
 int ffmpeg_get_video_info(ffmpeg_handle hanlde, uint32_t *video_width, uint32_t *video_height, video_info_t *info);
+
+
+/*
+0 - success
+*/
+int ffmpeg_get_ezip_info(const char *filename, uint32_t *w, uint32_t *h, uint32_t *max_size);
 
 /**
  * @brief get new frame in ffmepg cache, should call ffmpeg_is_video_available() first, call this if new video frame available

@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2019-2026 SiFli Technologies(Nanjing) Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef MEDIA_INTERNAL_H
 #define MEDIA_INTERNAL_H
 #include "sifli_resample.h"
@@ -154,6 +160,7 @@ typedef struct ffmpeg_decoder_tag
     uint32_t                frame_index;
     uint32_t                last_seconds;
     uint32_t                seek_to_second;
+    uint32_t                audio_played_ms;
     uint32_t                period;
     uint32_t                width;
     uint32_t                height;
