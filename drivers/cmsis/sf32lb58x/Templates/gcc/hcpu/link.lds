@@ -199,9 +199,13 @@ SECTIONS
     *.o                 (.text.rt_memset)
     *.o                 (.text.memset)
 
+    . = ALIGN(4);
+    __RW_IRAM_RET$$RW_start__ = .;
+
     *.o (.retm_data_*)
 
     . = ALIGN(4);
+    __RW_IRAM_RET$$RW_end__ = .;    
     __rw_retm_data_end__ = .;
 
   } > RET_RAM AT > ROM

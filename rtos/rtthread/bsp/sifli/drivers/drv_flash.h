@@ -218,6 +218,8 @@ int rt_flash_get_pass_id(uint32_t addr);
 */
 int rt_flash_get_uid(uint32_t addr, uint8_t *uid, uint32_t length);
 
+void rt_flash_enable_lock(uint8_t en);
+
 #ifdef BSP_USING_SPI_NAND
 
 /**
@@ -302,6 +304,16 @@ int rt_nand_erase_block(uint32_t addr);
 * @retval NAND MID if success, 0 if fail.
 */
 int rt_nand_read_id(uint32_t addr);
+
+/**
+* @brief  lock nand operation
+*/
+void rt_nand_lock();
+
+/**
+* @brief  unlock nand operation
+*/
+void rt_nand_unlock();
 
 /**
 * @brief  Get nand full valid size (byte).
