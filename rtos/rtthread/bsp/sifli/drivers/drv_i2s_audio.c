@@ -69,7 +69,7 @@ struct bf0_i2s_audio
 };
 
 
-static i2x_rx_callback i2x_rx_callback = NULL;
+static i2x_rx_callback_t i2x_rx_callback = NULL;
 
 ALIGN(4) static uint8_t audio_data[AUDIO_DATA_SIZE];
 ALIGN(4) static uint8_t audio_tx_data[AUDIO_DATA_SIZE];
@@ -1057,7 +1057,7 @@ void I2S3_RX_DMA_IRQHandler(void)
 #endif /* !DMA_SUPPORT_DYN_CHANNEL_ALLOC */
 
 #ifndef BSP_ENABLE_I2S_MIC
-void rt_device_set_i2s_dma_rx_callback(i2x_rx_callback callback)
+void rt_device_set_i2s_dma_rx_callback(i2x_rx_callback_t callback)
 {
     i2x_rx_callback = callback;
 }

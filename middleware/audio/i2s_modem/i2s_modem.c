@@ -177,7 +177,7 @@ int i2s_modem_open(void)
     thiz->client = audio_open(AUDIO_TYPE_MODEM_VOICE, AUDIO_TXRX, &pa, NULL, NULL);
     RT_ASSERT(thiz->client);
     rt_device_set_audprc_dma_rx_callback(audprc_dma_rx);
-    i2s_modem_start();
+
     rt_base_t level = rt_hw_interrupt_disable();
     thiz->is_opened = 1;
     rt_hw_interrupt_enable(level);
