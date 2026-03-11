@@ -239,15 +239,15 @@ void coredump_block_prepare(uint32_t addr, size_t len, coredump_block_header_t *
     block_header->addr = addr;
     block_header->len = len;
     remain_size = coredump_ctx.curr_backend->query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
-    if (remain_size <= sizeof(block_header))
+    if (remain_size <= sizeof(*block_header))
     {
         block_header->len = 0;
         return;
     }
 
-    if ((len + sizeof(block_header)) > remain_size)
+    if ((len + sizeof(*block_header)) > remain_size)
     {
-        block_header->len = remain_size - sizeof(block_header);
+        block_header->len = remain_size - sizeof(*block_header);
     }
 
 }
