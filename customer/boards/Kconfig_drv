@@ -1509,72 +1509,92 @@ menu "On-chip Peripheral RTOS Drivers"
         select RT_USING_SDIO
         default n
         depends on BF0_HCPU
-        if BSP_USING_SDIO
-            config BSP_USING_SDHCI
-                bool "Enable SD Host Control Interface"
-                default n
-                depends on !SOC_SF32LB52X
-                if BSP_USING_SDHCI
-                    config SD_MMC_DDR_SUPPORT
-                    bool "MMC card use DDR mode"
-                    default n
-                    config SD_MMC_OLINE_SUPPORT
-                    bool "MMC card support 8 line"
-                    default n
-                    menuconfig BSP_USING_SDHCI1
-                    bool "Enable SDHCI Handle 1"
-                    default n
-                    if BSP_USING_SDHCI1
-                        config SD_MAX_FREQ
-                        int "SD max output frequecy"
-                        default 24000000
-                        config SD_DMA_MODE
-                        int "DMA mode: 0 --> PIO, 1 --> SDMA, 2 --> ADMA"
-                        default 2
-                        config SDIO_CARD_MODE
-                        int "SDIO mode: 0 --> SDCARD, 1 --> EMMC, 2 --> SDIO"
-                        default 0
-                    endif
-                    menuconfig BSP_USING_SDHCI2
-                    bool "Enable SDHCI Handle 2"
-                    default n
-                    depends on SOC_SF32LB58X || SOC_SF32LB55X
-                    if BSP_USING_SDHCI2
-                        config SD2_MAX_FREQ
-                        int "SD2 max output frequecy"
-                        default 24000000
-                        config SD2_DMA_MODE
-                        int "DMA mode: 0 --> PIO, 1 --> SDMA, 2 --> ADMA"
-                        default 2
-                        config SDIO2_CARD_MODE
-                        int "SDIO mode: 0 --> SDCARD, 1 --> EMMC, 2 --> SDIO"
-                        default 0
-                    endif
-                endif
-            config BSP_USING_SD_LINE
-                bool "Enable Linear SDIO for LITE"
-                default n
-                depends on SOC_SF32LB56X || SOC_SF32LB52X
-                help
-                    Enable Linear SD interface
-            config SDIO_PM_MODE
+    if BSP_USING_SDIO
+        menuconfig BSP_USING_SDMMC1
+            bool "SDMMC1"
+            default n
+            select BSP_USING_SDHCI if SOC_SF32LB55X || SOC_SF32LB58X || SOC_SF32LB56X
+            select BSP_USING_SDHCI1 if SOC_SF32LB55X || SOC_SF32LB58X || SOC_SF32LB56X
+            select BSP_USING_SD_LINE if SOC_SF32LB52X
+            help
+                Enable SDMMC1
+
+        if BSP_USING_SDHCI1 && BSP_USING_SDMMC1
+            config SD_MAX_FREQ
+                int "MAX Output Frequency(Hz)"
+                default 24000000
+            config SD_DMA_MODE
+                int "DMA mode: 0 --> PIO, 1 --> SDMA, 2 --> ADMA"
+                default 2
+            config SDIO_CARD_MODE
+                int "SDIO mode: 0 --> SDCARD, 1 --> EMMC, 2 --> SDIO"
+                default 0
+        endif # BSP_USING_SDHCI1
+        
+        menuconfig BSP_USING_SDMMC2
+            bool "SDMMC2"
+            default n
+            select BSP_USING_SDHCI if SOC_SF32LB55X || SOC_SF32LB58X
+            select BSP_USING_SDHCI2 if SOC_SF32LB55X || SOC_SF32LB58X
+            select BSP_USING_SD_LINE if SOC_SF32LB56X
+            depends on !SOC_SF32LB52X
+            help 
+                Enable SDMMC2
+        if BSP_USING_SDHCI2 && BSP_USING_SDMMC2
+            config SD2_MAX_FREQ
+                int "MAX Output Frequency(Hz)"
+                default 24000000
+            config SD2_DMA_MODE
+                int "DMA mode: 0 --> PIO, 1 --> SDMA, 2 --> ADMA"
+                default 2
+            config SDIO2_CARD_MODE
+                int "SDIO mode: 0 --> SDCARD, 1 --> EMMC, 2 --> SDIO"
+                default 0
+        endif # BSP_USING_SDHCI2
+
+        config BSP_USING_SDHCI
+            bool
+        config BSP_USING_SDHCI1
+            bool
+        config BSP_USING_SDHCI2
+            bool
+        config BSP_USING_SD_LINE
+            bool
+        menu "Common Option"
+        if BSP_USING_SDHCI
+
+        config SD_MMC_DDR_SUPPORT
+            bool "MMC card use DDR mode"
+            default n
+        config SD_MMC_OLINE_SUPPORT
+            bool "MMC card support 8 line"
+            default n
+
+        endif # BSP_USING_SDHCI
+
+        config SDIO_PM_MODE
             bool "Enable SDIO PM"
             default n
             depends on PM_STANDBY_ENABLE
-            if SDIO_PM_MODE
-                choice
-                    prompt "Select SDIO PM Mode"
-                    default SDIO_POWER_PM_UP
-                    config SDIO_POWER_PM_UP
-                        bool "VCC and VCCQ Don't lose power"
-                    config SDIO_POWER_PM_ALL_DOWN
-                        bool "VCC and VCCQ All power off"
-                    config SDIO_POWER_PM_VCC_DOWN
-                        bool "only close VCC"
-                endchoice
-            endif
 
-        endif
+        if SDIO_PM_MODE
+
+        choice
+            prompt "Select SDIO PM Mode"
+            default SDIO_POWER_PM_UP
+            config SDIO_POWER_PM_UP
+                bool "VCC and VCCQ Don't lose power"
+            config SDIO_POWER_PM_ALL_DOWN
+                bool "VCC and VCCQ All power off"
+            config SDIO_POWER_PM_VCC_DOWN
+                bool "only close VCC"
+        endchoice
+
+        endif # SDIO_PM_MODE
+
+        endmenu # Common Option
+
+    endif # BSP_USING_SDIO
 
     config BSP_USING_PINMUX
         bool "Enable Pin Mux"
