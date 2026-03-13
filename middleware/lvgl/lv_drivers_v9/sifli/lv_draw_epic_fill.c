@@ -98,12 +98,15 @@ void lv_draw_epic_fill(lv_draw_task_t *draw_task, const lv_draw_fill_dsc_t *dsc,
     }
     else
     {
-
+        uint32_t epic_cf = lv_img_2_epic_cf(dest_cf);
+        
+        LV_ASSERT_MSG(EPIC_SUPPROT_OUT_FORMAT(epic_cf), "EPIC: Color format not supported for gradient fill");
+        
         EPIC_GradCfgTypeDef param;
         HAL_EPIC_FillGradDataInit(&param);
 
         param.start = dest_blend_area_buf;
-        param.color_mode = lv_img_2_epic_cf(dest_cf);
+        param.color_mode = epic_cf;
         param.width = lv_area_get_width(&blend_area);
         param.height = lv_area_get_height(&blend_area);
         param.total_width = lv_area_get_width(&layer->buf_area);

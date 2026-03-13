@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 SiFli Technologies(Nanjing) Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <rtthread.h>
 #include "littlevgl2rtt.h"
 #ifdef LV_USE_LVSF
@@ -470,9 +476,9 @@ rt_err_t littlevgl2rtt_init(const char *name)
 
     lv_hal_init(name);
 #ifdef LV_USE_LVSF
-    #ifndef LV_USE_THEME_DEFALUT
+    #ifndef LV_USE_THEME_DEFAULT
     lv_theme_1_init();
-    #endif /* LV_USE_THEME_DEFALUT */
+    #endif /* LV_USE_THEME_DEFAULT */
 #endif /* LV_USE_LVSF */
 #if 0
 #ifdef LCD_SDL2

@@ -173,6 +173,20 @@ static int32_t evaluate(lv_draw_unit_t *draw_unit, lv_draw_task_t *t)
         if ((LV_GRADIENT_MAX_STOPS > 2) && (draw_dsc->grad.dir != (lv_grad_dir_t)LV_GRAD_DIR_NONE))
             return 0;
 
+        if (draw_dsc->grad.dir != LV_GRAD_DIR_NONE)
+        {
+            lv_layer_t *target_layer = t->target_layer;
+            if (target_layer)
+            {
+                lv_color_format_t dest_cf = target_layer->color_format;
+                uint32_t epic_cf = lv_img_2_epic_cf(dest_cf);
+                if (!EPIC_SUPPROT_OUT_FORMAT(epic_cf))
+                {
+                    return 0;
+                }
+            }
+        }
+
         if (t->preference_score > 70)
         {
             t->preference_score = 70;
