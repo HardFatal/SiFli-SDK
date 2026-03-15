@@ -215,12 +215,14 @@ static coredump_err_code_t coredump_set_mode(coredump_type_t coredump_type)
     {
         coredump_ctx.curr_backend = coredump_ctx.fulldump_backend;
     }
-#ifdef COREDUMP_MINIDUMP_ENABLED
     else
     {
-        coredump_ctx.curr_backend = coredump_ctx.minidump_backend;;
-    }
+#ifdef COREDUMP_MINIDUMP_ENABLED
+        coredump_ctx.curr_backend = coredump_ctx.minidump_backend;
+#else
+        return COREDUMP_ERR_INVALID_PARAM;
 #endif /* COREDUMP_MINIDUMP_ENABLED */
+    }
 
     return coredump_ctx.curr_backend->set_mode(coredump_type);
 }
@@ -233,21 +235,20 @@ size_t coredump_raw_write(uint8_t *buf, size_t len)
 
 void coredump_block_prepare(uint32_t addr, size_t len, coredump_block_header_t *block_header)
 {
-    coredump_err_code_t r;
-    size_t remain_size;
+    int32_t remain_size;
 
     block_header->addr = addr;
     block_header->len = len;
     remain_size = coredump_ctx.curr_backend->query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
-    if (remain_size <= sizeof(*block_header))
+    if ((remain_size < 0) || ((size_t)remain_size <= sizeof(*block_header)))
     {
         block_header->len = 0;
         return;
     }
 
-    if ((len + sizeof(*block_header)) > remain_size)
+    if ((len + sizeof(*block_header)) > (size_t)remain_size)
     {
-        block_header->len = remain_size - sizeof(*block_header);
+        block_header->len = (size_t)remain_size - sizeof(*block_header);
     }
 
 }
@@ -313,10 +314,16 @@ static void coredump_write_header(void)
     char header_str[HEADER_STR_SIZE] = {0};
     time_t now;
     struct tm *p_tm;
+    struct tm tm_tmp;
     const char *fmt_str;
 
     now = time(RT_NULL);
     p_tm = localtime(&now);
+    if (!p_tm)
+    {
+        p_tm = &tm_tmp;
+        memset(p_tm, 0, sizeof(tm_tmp));
+    }
 
 #if defined(SOC_SF32LB55X)
     fmt_str = "55X_" HEADER_FORMAT_STR;
@@ -343,17 +350,15 @@ static rt_err_t coredump_write_tail(void)
     rt_err_t ret = RT_EOK;
     coredump_block_header_t block_header;
     int32_t remain_size;
-    int32_t r;
-
 
     remain_size = coredump_query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
-    if (remain_size < sizeof(block_header))
+    if ((remain_size < 0) || ((size_t)remain_size < sizeof(block_header)))
     {
         return RT_EFULL;
     }
 
     block_header.addr = COREDUMP_MINIDUMP_TAIL_MAGIC;
-    block_header.len = remain_size - sizeof(block_header);
+    block_header.len = (size_t)remain_size - sizeof(block_header);
     coredump_raw_write((uint8_t *)&block_header, sizeof(block_header));
     return RT_EOK;
 }
@@ -569,8 +574,10 @@ static void coredump_dump_curr_thread_stack(void)
     struct rt_thread *curr_thread;
 
     curr_thread = rt_thread_self();
-
-    coredump_block_write((uint32_t)curr_thread->stack_addr, curr_thread->stack_size);
+    if (curr_thread)
+    {
+        coredump_block_write((uint32_t)curr_thread->stack_addr, curr_thread->stack_size);
+    }
 }
 #endif /* COREDUMP_HCPU_STACK_DATA_ENABLED || COREDUMP_MINIDUMP_ENABLED */
 
@@ -601,10 +608,9 @@ static rt_err_t coredump_dump_thread_stack(coredump_stack_type_t stack_type)
 
     info = rt_object_get_information(RT_Object_Class_Thread);
     thread_list = &info->object_list;
+    psp = __get_PSP();
     for (node = thread_list->next; node != thread_list; node = node->next)
     {
-        psp = __get_PSP();
-
         thread = rt_list_entry(node, struct rt_thread, list);
 
         if ((COREDUMP_STACK_TYPE_CURR_THREAD == stack_type)
@@ -634,9 +640,18 @@ static rt_err_t coredump_dump_thread_stack(coredump_stack_type_t stack_type)
             /* PSP is not current thread, stack top is saved in thread->sp */
             start_addr = (uint32_t)thread->sp;
 
-            /* including 4 bytes pointed by SP */
-            len = (uint32_t)thread->sp - (rt_uint32_t)thread->stack_addr;
-            len = thread->stack_size - len;
+            if ((uint32_t)thread->sp >= (uint32_t)thread->stack_addr)
+            {
+                /* including 4 bytes pointed by SP */
+                len = (uint32_t)thread->sp - (rt_uint32_t)thread->stack_addr;
+                len = thread->stack_size - len;
+            }
+            else
+            {
+                /* SP is overflowed, dump whole stack */
+                start_addr = (uint32_t)thread->stack_addr;
+                len = thread->stack_size;
+            }
         }
 
         if (len > coredump_block_write(start_addr, len))
@@ -658,17 +673,17 @@ static void coredump_dump_hcpu_log_minimum(void)
     coredump_block_header_t block_header_loop;
     coredump_block_header_t block_header;
     coredump_block_header_t block_header_special;
-    size_t remain_size;
+    int32_t remain_size;
     size_t wr_len = MINLEN_LOG_SAVE;
 
     remain_size = coredump_query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
-    if (remain_size <= sizeof(block_header))
+    if ((remain_size < 0) || ((size_t)remain_size <= sizeof(block_header)))
     {
         return;
     }
-    if ((wr_len + sizeof(block_header)) >= remain_size)
+    if ((wr_len + sizeof(block_header)) >= (size_t)remain_size)
     {
-        wr_len = remain_size - sizeof(block_header);
+        wr_len = (size_t)remain_size - sizeof(block_header);
     }
 
     block_header_loop.len = 0;
@@ -723,7 +738,7 @@ rt_err_t coredump_dump_hcpu_log_remaining(void)
     coredump_block_header_t block_header_loop;
     coredump_block_header_t block_header;
     coredump_block_header_t block_header_special;
-    size_t remain_size;
+    int32_t remain_size;
 
     if (coredump_ctx.log_pos < 0) //save over in step1
     {
@@ -731,27 +746,30 @@ rt_err_t coredump_dump_hcpu_log_remaining(void)
     }
 
     remain_size = coredump_query(COREDUMP_QUERY_REMAIN_SIZE, NULL);
-
+    if ((remain_size < 0) || ((size_t)remain_size <= sizeof(block_header)))
+    {
+        return RT_EFULL;
+    }
     block_header_loop.len = 0;
     if (coredump_ctx.log_pos >= log_buf->wr_offset)
     {
-        if (coredump_ctx.log_pos - log_buf->wr_offset + sizeof(block_header) > remain_size)
+        if ((size_t)coredump_ctx.log_pos - log_buf->wr_offset + sizeof(block_header) > (size_t)remain_size)
         {
-            block_header.len = remain_size - sizeof(block_header);
+            block_header.len = (size_t)remain_size - sizeof(block_header);
             block_header.addr = (uint32_t)&log_buf->buf[coredump_ctx.log_pos - block_header.len];
             ret = RT_EFULL;
         }
         else
         {
-            block_header.len = coredump_ctx.log_pos - log_buf->wr_offset;
+            block_header.len = (size_t)coredump_ctx.log_pos - log_buf->wr_offset;
             block_header.addr = (uint32_t)&log_buf->buf[log_buf->wr_offset];
         }
     }
     else
     {
-        if (coredump_ctx.log_pos + sizeof(block_header) > remain_size)
+        if ((size_t)coredump_ctx.log_pos + sizeof(block_header) > (size_t)remain_size)
         {
-            block_header.len = remain_size - sizeof(block_header);
+            block_header.len = (size_t)remain_size - sizeof(block_header);
             block_header.addr = (uint32_t)&log_buf->buf[coredump_ctx.log_pos - block_header.len];
             ret = RT_EFULL;
         }
@@ -759,9 +777,9 @@ rt_err_t coredump_dump_hcpu_log_remaining(void)
         {
             if (log_buf->full)
             {
-                if (ULOG_RAM_BE_BUF_SIZE - (log_buf->wr_offset - coredump_ctx.log_pos) + sizeof(block_header) > remain_size)
+                if (ULOG_RAM_BE_BUF_SIZE - (log_buf->wr_offset - coredump_ctx.log_pos) + sizeof(block_header) > (size_t)remain_size)
                 {
-                    block_header_loop.len = remain_size - (sizeof(block_header) + coredump_ctx.log_pos);
+                    block_header_loop.len = (size_t)remain_size - (sizeof(block_header) + (size_t)coredump_ctx.log_pos);
                     block_header_loop.addr = (uint32_t)&log_buf->buf[ULOG_RAM_BE_BUF_SIZE - block_header_loop.len];
                     ret = RT_EFULL;
                 }
@@ -783,7 +801,7 @@ rt_err_t coredump_dump_hcpu_log_remaining(void)
 
         block_header_special.addr = COREDUMP_RAMLOG_REMAINING_MAGIC;
         block_header_special.len = block_header_loop.len + block_header.len;
-        coredump_raw_write((uint8_t *)&block_header_special, sizeof(block_header));
+        coredump_raw_write((uint8_t *)&block_header_special, sizeof(block_header_special));
 
         if (block_header_loop.len > 0)
         {
@@ -910,7 +928,7 @@ static rt_err_t coredump_full(void)
 #ifdef COREDUMP_HCPU_HEAP_DATA_ENABLED
     COREDUMP_RECORD_STEP(RECORD_CRASH_SAVE_HCPU_HEAP);
     ret = coredump_dump_all_heaps(true);
-    if (ret == -RT_EFULL)
+    if (ret == RT_EFULL)
     {
         goto __EXIT;
     }
@@ -946,7 +964,7 @@ static rt_err_t coredump_full(void)
 #endif
 
     ret = coredump_dump_hcpu_log_remaining();
-    if (ret == -RT_EFULL)
+    if (ret == RT_EFULL)
     {
         goto __EXIT;
     }
@@ -1012,6 +1030,7 @@ void coredump(void)
     COREDUMP_RECORD_STEP(RECORD_CRASH_SAVE_END);
 
 __EXIT:
+    coredump_ctx.state = COREDUMP_STATE_IDLE;
 
 #ifdef RT_USING_WDT
     if (rt_hw_watchdog_get_status())
@@ -1092,7 +1111,7 @@ static int coredump_config(int argc, char **argv)
         {
             addr = (uint32_t)coredump_query(COREDUMP_QUERY_PATH, NULL);
             max_size = (size_t)coredump_query(COREDUMP_QUERY_MAX_SIZE, NULL);
-            rt_kprintf("g_save_assert:%d g_assertmem_addr:0x%x g_default_context.write_max_size:%d\n",
+            rt_kprintf("g_save_assert:%d g_assertmem_addr:0x%x g_default_context.write_max_size:%u\n",
                        coredump_ctx.enabled_flag, addr, max_size);
         }
     }
@@ -1117,6 +1136,8 @@ int coredump_set_onoff(int flag)
 
 int coredump_clear(void)
 {
+    RT_ASSERT(coredump_ctx.curr_backend);
+
     coredump_ctx.curr_backend->clear();
 
     return 0;
@@ -1273,5 +1294,3 @@ static int coredump_init(void)
     return 0;
 }
 INIT_PRE_APP_EXPORT(coredump_init);
-
-

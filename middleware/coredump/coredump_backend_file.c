@@ -148,9 +148,13 @@ static size_t coredump_backend_file_write(uint8_t *buf, size_t len)
     int r;
 
     r = write(ctx->fid, buf, len);
+    if (r < 0)
+    {
+        return 0;
+    }
     ctx->wr_pos += r;
 
-    return r;
+    return (size_t)r;
 }
 
 static int32_t coredump_backend_file_query(coredump_query_id_t id, void *arg)
