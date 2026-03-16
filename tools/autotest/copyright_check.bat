@@ -52,7 +52,10 @@ echo [INFO] Directories are ready.
 :: STAGE 2: Copy Changed Files
 :: -----------------------------------------------------------------------------
 echo [INFO] Identifying and copying changed files from last commit...
-
+chcp 65001 >nul
+git config --local core.quotepath false
+git config --local i18n.commitencoding utf-8
+git config --local i18n.logoutputencoding utf-8
 for /f "usebackq delims=" %%F in (`
     git diff --name-only --diff-filter=AM HEAD~1 HEAD
 `) do (
