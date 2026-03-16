@@ -21,7 +21,7 @@
 
 #define MODEM_I2S_DEBUG             0
 #define MODEM_I2S_DEVICE_MODE       1 /* 1: modem i2s is master; 0: modem i2s is slave */
-#define MODEM_I2S_DEVICE_CHANNELS   2
+#define MODEM_I2S_DEVICE_CHANNELS   1
 #define MODEM_I2S_DEVICE_NAME       "i2s2"
 
 #define SWITCH_BUFFER_SIZE          (320 * 3)
@@ -129,7 +129,7 @@ static void audprc_dma_rx(uint8_t channel_id, uint8_t *data, rt_size_t len)
 #if MODEM_I2S_DEVICE_CHANNELS == 2
         mono2stereo((int16_t *)data, len / 2, thiz->stereo);
 #if MODEM_I2S_DEBUG
-        rt_ringbuffer_put(&thiz->i2s2audprc_rb, (uint8_t *)thiz->stereo, sizeof(thiz->stereo));
+        rt_ringbuffer_put(&thiz->audprc2i2s_rb, (uint8_t *)thiz->stereo, sizeof(thiz->stereo));
         rt_event_send(thiz->event, MODEM_EVENT_AUDPRC_RX);
 #else
         bf0_i2s_device_write(thiz->i2s_dev, 0, (uint8_t *)thiz->stereo, sizeof(thiz->stereo));
@@ -150,6 +150,11 @@ int i2s_modem_open(void)
     struct modem_server *thiz = &modem;
 
     //audio_server_set_private_volume(AUDIO_TYPE_MODEM_VOICE, 15);
+    if (thiz->is_opened)
+    {
+        LOG_E("%s reopen err", __func__);
+        return -2;
+    }
 
 #if MODEM_I2S_DEBUG
     thiz->exit = 0;

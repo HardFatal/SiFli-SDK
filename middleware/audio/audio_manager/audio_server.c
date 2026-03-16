@@ -1327,7 +1327,7 @@ static void start_rx(audio_device_speaker_t *my)
     }
 }
 
-static void start_txrx(audio_device_speaker_t *my)
+static void start_txrx(audio_device_speaker_t *my, bool is_modem)
 {
     int stream;
     my->is_wait_rx_start = 1;
@@ -1339,19 +1339,34 @@ static void start_txrx(audio_device_speaker_t *my)
     // 6. DAC mute
     rt_device_control(my->audcodec_dev, AUDIO_CTL_MUTE, (void *)1);
     // 7 DAC start
-    stream = AUDIO_STREAM_REPLAY | ((1 << HAL_AUDPRC_TX_CH0) << 8);
-    LOG_I("speaker START stream=0x%x", stream);
-    rt_device_control(my->audprc_dev, AUDIO_CTL_START, (void *)&stream);
-    stream = AUDIO_STREAM_REPLAY | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
-    LOG_I("codec START stream=0x%x", stream);
-    rt_device_control(my->audcodec_dev, AUDIO_CTL_START, &stream);
+    if (is_modem)
+    {
+        LOG_I("modem START stream=0x%x", stream);
+        my->is_wait_rx_start = 0;
+        my->need_adc_rx = 0;
+        stream = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDCODEC_ADC_CH0) << 8) | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
+        rt_device_control(my->audcodec_dev, AUDIO_CTL_START, &stream);
+        stream = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDPRC_RX_CH0) << 8) | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+        rt_device_control(my->audprc_dev, AUDIO_CTL_START, &stream);
+        my->opened_map_flag |= OPEN_MAP_TX;
+        my->tx_ready = 1;
+    }
+    else
+    {
+        stream = AUDIO_STREAM_REPLAY | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+        LOG_I("speaker START stream=0x%x", stream);
+        rt_device_control(my->audprc_dev, AUDIO_CTL_START, (void *)&stream);
+        stream = AUDIO_STREAM_REPLAY | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
+        LOG_I("codec START stream=0x%x", stream);
+        rt_device_control(my->audcodec_dev, AUDIO_CTL_START, &stream);
+        my->opened_map_flag |= OPEN_MAP_TX;
+        my->tx_ready = 1;
+        //wait rx start
+        LOG_I("wait rx start");
+        rt_err_t got = rt_event_recv(my->event, 1, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, 500, NULL) ;
+        LOG_I("got rx start %d", got);
+    }
 #endif
-    my->opened_map_flag |= OPEN_MAP_TX;
-    my->tx_ready = 1;
-    //wait rx start
-    LOG_I("wait rx start");
-    rt_err_t got = rt_event_recv(my->event, 1, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, 1000, NULL) ;
-    LOG_I("got rx start %d", got);
     rt_thread_mdelay(10);
 }
 
@@ -1608,7 +1623,10 @@ static int audio_device_speaker_open(void *user_data, audio_device_input_callbac
             audio_3a_open(my->tx_samplerate, (uint8_t)(client->audio_type == AUDIO_TYPE_BT_VOICE), client->parameter.disable_uplink_agc);
             client->is_3a_opened = 1;
         }
-
+        if (client->audio_type == AUDIO_TYPE_MODEM_VOICE)
+        {
+            my->tx_dma_size = CODEC_DATA_UNIT_LEN;
+        }
         my->tx_data_tmp = audio_mem_malloc(my->tx_dma_size);
         RT_ASSERT(my->tx_data_tmp);
     }
@@ -1719,7 +1737,7 @@ static int audio_device_speaker_open(void *user_data, audio_device_input_callbac
     }
     else if (need_tx_init && need_rx_init)
     {
-        start_txrx(my);
+        start_txrx(my, client->audio_type == AUDIO_TYPE_MODEM_VOICE);
     }
     // 7. open PA, DAC unmute
     if (need_tx_init)
@@ -2519,7 +2537,7 @@ static void audio_device_close(audio_server_t *server, audio_client_t client)
         rt_list_remove(&suspend1->node);
         if (suspend1->parameter.is_need_3a)
         {
-            audio_3a_open(suspend1->parameter.read_bits_per_sample, (uint8_t)(suspend1->audio_type == AUDIO_TYPE_BT_VOICE), suspend1->parameter.disable_uplink_agc);
+            audio_3a_open(suspend1->parameter.write_samplerate, (uint8_t)(suspend1->audio_type == AUDIO_TYPE_BT_VOICE), suspend1->parameter.disable_uplink_agc);
             suspend1->is_3a_opened = 1;
         }
         audio_device_open(server, suspend1);
