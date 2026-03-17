@@ -91,7 +91,7 @@ scancode -clipeu ^
   --classify ^
   --summary ^
   --verbose "%SCAN_SOURCE_DIR%" ^
-  --processes 8 ^
+  --processes 2 ^
   --json "%SCANCODE_REPORT_JSON%" ^
   --html "%SCANCODE_REPORT_HTML%"
 
