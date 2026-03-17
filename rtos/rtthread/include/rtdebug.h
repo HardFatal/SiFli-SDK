@@ -105,7 +105,12 @@ if (!(EX))                                                                    \
 #endif
 
 /* Macro to check current context */
-#if RT_DEBUG_CONTEXT_CHECK
+/* During WIN32 operation, the Windows thread between rt_enter_critical and
+ * rt_exit_critical is time-sliced. It may be scheduled to another thread
+ * in the middle, causing a detection exception in rt_interrupt_get_nest.
+ * Therefore, RT_DEBUG_NOT_IN_INTERRUPT is disabled.
+ */
+#if RT_DEBUG_CONTEXT_CHECK && !defined(_WIN32)
 #define RT_DEBUG_NOT_IN_INTERRUPT                                             \
 do                                                                            \
 {                                                                             \
