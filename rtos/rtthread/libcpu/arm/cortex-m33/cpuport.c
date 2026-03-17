@@ -421,6 +421,11 @@ static void handle_exception(struct exception_info *exception_info)
     struct exception_stack_frame *exception_stack = &exception_info->stack_frame.exception_stack_frame;
     struct stack_frame *context = &exception_info->stack_frame;
 
+// Clean Dcache first, in case latter code has issue.
+#if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
+    SCB_CleanDCache();
+#endif
+
 #ifdef SOC_BF0_HCPU
     saved_hpsys_aon_issr_reg = hwp_hpsys_aon->ISSR;
 #endif /* SOC_BF0_HCPU */
@@ -519,10 +524,6 @@ static void handle_exception(struct exception_info *exception_info)
     ulog_flush();
 #endif
 
-#if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
-    SCB_CleanDCache();
-#endif
-
 #if (defined(SOC_BF0_LCPU) && (!defined(FPGA)))
     extern void HAL_LCPU_ASSERT_INFO_set(void);
     HAL_LCPU_ASSERT_INFO_set();
@@ -574,6 +575,12 @@ __ROM_USED void rt_hw_mem_manage_exception(struct exception_info *exception_info
 }
 __ROM_USED void rt_hw_do_fatal_error(struct stack_frame *stack_frame)
 {
+
+    // Clean Dcache first, in case latter code has issue.
+#if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
+    SCB_CleanDCache();
+#endif
+
     /* Avoid assertion happening after crashdump for hardfault */
     if (RT_NO_ERROR == error_reason)
     {
@@ -616,10 +623,6 @@ __ROM_USED void rt_hw_do_fatal_error(struct stack_frame *stack_frame)
 
 #if defined(RT_USING_ULOG)
     ulog_flush();
-#endif
-
-#if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
-    SCB_CleanDCache();
 #endif
 
 #if (defined(SOC_BF0_LCPU) && (!defined(FPGA)))
