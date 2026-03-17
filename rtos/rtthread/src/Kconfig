@@ -194,6 +194,19 @@ config RT_DEBUG_MODULE
 config RT_SCHEDULER_LOCK_DEBUG
     bool "Enable Debugging of Schedule lock"
     default n
+
+
+choice RT_ASSERT_PRINT_TYPE
+    prompt "Assert print info type"
+    default  ASSERT_NORMAL
+    config ASSERT_NORMAL
+        bool "Print assert normal info(maximum space)"
+    config ASSERT_OPTIMIZE_2
+        bool "Print assert info without assert statement(minor space)"
+    config ASSERT_OPTIMIZE_1
+        bool "Print assert info only address(minimum space)"
+endchoice # RT_ASSERT_PRINT_TYPE
+
 endif
 
 menu "Inter-Thread communication"

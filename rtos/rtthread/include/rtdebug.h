@@ -84,11 +84,17 @@ do                                                                            \
 }                                                                             \
 while (0)
 
-#ifdef LCPU_MEM_OPTIMIZE
+#if defined (ASSERT_OPTIMIZE_1)
 #define RT_ASSERT(EX)                                                         \
 if (!(EX))                                                                    \
 {                                                                             \
-    rt_assert_handler("ASSERT", __FUNCTION__, __LINE__);                           \
+    rt_assert_func();                                                         \
+}
+#elif defined (ASSERT_OPTIMIZE_2) || defined (LCPU_MEM_OPTIMIZE)
+#define RT_ASSERT(EX)                                                         \
+if (!(EX))                                                                    \
+{                                                                             \
+    rt_assert_func(__FUNCTION__, __LINE__);                                   \
 }
 #else
 #define RT_ASSERT(EX)                                                         \

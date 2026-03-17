@@ -634,6 +634,12 @@ void rt_assert_set_hook_rom(void (*hook)(const char *ex, const char *func, rt_si
 #ifdef __CODE_CHECKER__
 RT_NO_RETURN
 #endif /* __CODE_CHECKER__ */
+
+#if defined (ASSERT_OPTIMIZE_1)
+extern void rt_assert_func(void);
+#elif defined (ASSERT_OPTIMIZE_2)  || defined (LCPU_MEM_OPTIMIZE)
+extern void rt_assert_func(const char *func, rt_size_t line);
+#endif /* ASSERT_OPTIMIZE_1 */
 void rt_assert_handler(const char *ex, const char *func, rt_size_t line);
 #endif /* RT_DEBUG */
 
