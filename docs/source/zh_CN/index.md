@@ -48,6 +48,7 @@ middleware/index
 audio/index
 supported_boards/index
 bootloader
+tools/index
 example/index
 api/index
 contribute/index
