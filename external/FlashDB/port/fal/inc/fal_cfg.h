@@ -28,6 +28,13 @@
     #define NOR_FLASH4_DEV_NAME             "flash4"
 #endif /* NOR_FLASH4_DEV_NAME */
 
+#ifndef SDMMC1_DEV_NAME
+    #define SDMMC1_DEV_NAME                 "sd0"
+#endif /* SDMMC1_DEV_NAME */
+
+#ifndef SDMMC2_DEV_NAME
+    #define SDMMC2_DEV_NAME                 "sd1"
+#endif /* SDMMC2_DEV_NAME */
 
 #define FAL_PART_DEF(flash_part_id)      \
     {FAL_PART_MAGIC_WORD,                \
@@ -56,6 +63,8 @@ extern const struct fal_flash_dev nor_flash1;
 extern const struct fal_flash_dev nor_flash2;
 extern const struct fal_flash_dev nor_flash3;
 extern const struct fal_flash_dev nor_flash4;
+extern const struct fal_flash_dev fal_sdmmc1;
+extern const struct fal_flash_dev fal_sdmmc2;
 
 #ifdef BSP_USING_PC_SIMULATOR
 /* flash device table */
@@ -65,6 +74,8 @@ extern const struct fal_flash_dev nor_flash4;
     &nor_flash2,                                                     \
     &nor_flash3,                                                     \
     &nor_flash4,                                                     \
+    &fal_sdmmc1,                                                     \
+    &fal_sdmmc2,                                                     \
 }
 #endif
 

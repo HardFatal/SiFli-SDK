@@ -16,6 +16,10 @@
 #include <rtdevice.h>
 #include <string.h>
 
+#if defined(RT_USING_SPI_MSD)
+#include <spi_msd.h>
+#endif /* RT_USING_SPI_MSD */
+
 /* ========================== block device ======================== */
 struct fal_blk_device
 {
@@ -504,7 +508,7 @@ static const struct rt_mtd_nand_driver_ops spi_nand_ops =
  * @return != NULL: created MTD NOR device
  *            NULL: created failed
  */
-struct rt_device *fal_mtd_nor_device_create(const char *parition_name)
+struct rt_device *fal_mtd_device_create(const char *parition_name)
 {
     struct fal_mtd_nor_device *mtd_nor_dev;
 #ifdef RT_USING_MTD_NAND    
@@ -625,10 +629,56 @@ struct rt_device *fal_mtd_nor_device_create(const char *parition_name)
     return dev;
 }
 
-int fal_mtd_nor_device_register(void)
+#if defined(RT_USING_SPI_MSD)
+struct rt_device *fal_mtd_msd_device_create(const struct fal_partition *fal_part)
+{
+    rt_device_t msd = rt_device_find(fal_part->flash_name);
+    if (msd == NULL)
+    {
+        log_e("Error: the flash device name (%s) is not found.", fal_part->flash_name);
+        return NULL;
+    }
+
+    struct msd_device* msd_dev = (struct msd_device *)msd->user_data;
+
+    struct msd_device * msd_file_dev = (struct msd_device *)rt_malloc(sizeof(struct msd_device));
+    if(msd_file_dev)
+    {
+        msd_file_dev->parent.type        = RT_Device_Class_MTD;
+#ifdef RT_USING_DEVICE_OPS
+        msd_file_dev->parent.ops        = msd_dev->parent.ops;
+#else
+        msd_file_dev->parent.init       = msd_dev->parent.init;
+        msd_file_dev->parent.open       = msd_dev->parent.open;
+        msd_file_dev->parent.close      = msd_dev->parent.close;
+        msd_file_dev->parent.read       = msd_dev->parent.read;
+        msd_file_dev->parent.write      = msd_dev->parent.write;
+        msd_file_dev->parent.control    = msd_dev->parent.control;
+#endif
+        if (RT_NULL != rt_strstr(fal_part->name, "code_pang"))
+            msd_file_dev->offset            = fal_part->offset >> 9;
+        else
+            msd_file_dev->offset            = fal_part->offset;
+        msd_file_dev->spi_device        = msd_dev->spi_device;
+        msd_file_dev->geometry.bytes_per_sector = SECTOR_SIZE;  /* 512 */
+        msd_file_dev->geometry.block_size = SECTOR_SIZE;        /* 512 */
+        msd_file_dev->geometry.sector_count = fal_part->len >> 9;
+        
+        rt_device_register(&msd_file_dev->parent, fal_part->name,
+                           RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_REMOVABLE | RT_DEVICE_FLAG_STANDALONE);
+        rt_kprintf("fal_mtd_msd_device_create dev:%s part:%s offset:0x%x, size:0x%x\n", fal_part->flash_name, fal_part->name, msd_file_dev->offset, msd_file_dev->geometry.sector_count);
+        return RT_DEVICE(&msd_file_dev->parent);;
+     }
+    return NULL;
+}
+
+#endif /* RT_USING_SPI_MSD */
+
+int fal_device_register(void)
 {
     size_t len;
     const struct fal_partition *partition;
+    const struct fal_flash_dev *fal_flash = NULL;    
     uint32_t i;
 
     fal_init();
@@ -637,12 +687,29 @@ int fal_mtd_nor_device_register(void)
 
     for (i = 0; i < len; i++)
     {
-        fal_mtd_nor_device_create(partition[i].name);
+        if ((fal_flash = fal_flash_device_find(partition[i].flash_name)) == NULL)
+        {
+            log_e("Error: the flash device name (%s) is not found.", partition[i].flash_name);
+            continue;
+        }
+
+        if (2 != fal_flash->nand_flag)
+        {
+            fal_mtd_device_create(partition[i].name);
+        }
+        else
+        {
+#if defined(RT_USING_SDIO)
+            rt_mmcsd_blk_device_create(partition[i].flash_name, partition[i].name, partition[i].offset>>9, partition[i].len>>9);
+#elif defined(RT_USING_SPI_MSD)
+            fal_mtd_msd_device_create(&partition[i]);
+#endif /* RT_USING_SDIO */
+        }
     }
 
     return 0;
 }
-INIT_DEVICE_EXPORT(fal_mtd_nor_device_register);
+INIT_COMPONENT_EXPORT(fal_device_register);
 
 #endif /* defined(RT_USING_MTD_NOR) */
 

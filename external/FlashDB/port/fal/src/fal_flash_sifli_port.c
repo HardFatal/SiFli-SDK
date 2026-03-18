@@ -287,3 +287,96 @@ const struct fal_flash_dev FAL_DEV =
 };
 #endif
 
+
+#if defined(BSP_USING_SDMMC1) || defined(RT_USING_SPI_MSD)
+
+#undef FAL_DEV
+#undef FAL_NAME
+#undef FAL_SIZE
+#undef PAGE_SIZE
+#undef SECTOR_SIZE
+#undef NAND_FLAG
+#undef FAL_BASE
+
+#define FAL_NAME    "sd0"
+#define FAL_DEV     fal_sdmmc1
+#define FAL_SIZE    0x100000000
+
+#define PAGE_SIZE       512
+#define SECTOR_SIZE     512
+#define NAND_FLAG       2
+#define FAL_BASE        SDMMC1_MEM_BASE
+
+static int sdmmc1_read(long offset, uint8_t *buf, size_t size)
+{
+    return 0;
+}
+static int sdmmc1_write(long offset, const uint8_t *buf, size_t size)
+{
+    return 0;
+}
+
+static int sdmmc1_erase(long offset, size_t size)
+{
+    return 0;
+}
+
+const struct fal_flash_dev FAL_DEV =
+{
+    .name        = FAL_NAME,
+    .addr        = FAL_BASE,
+    .len         = (FAL_SIZE >> 9),
+    .blk_size    = PAGE_SIZE,
+    .sector_size = SECTOR_SIZE,
+    .nand_flag   = NAND_FLAG,
+    .ops         = {init, sdmmc1_read, sdmmc1_write, sdmmc1_erase},
+    .write_gran  = 32
+};
+#endif /* BSP_USING_SDMMC1 || RT_USING_SPI_MSD */
+
+
+#if defined(BSP_USING_SDMMC2)
+
+#undef FAL_DEV
+#undef FAL_NAME
+#undef FAL_SIZE
+#undef PAGE_SIZE
+#undef SECTOR_SIZE
+#undef NAND_FLAG
+#undef FAL_BASE
+
+#define FAL_NAME    "sd1"
+#define FAL_DEV     fal_sdmmc2
+#define FAL_SIZE    0x100000000
+
+#define PAGE_SIZE       512
+#define SECTOR_SIZE     512
+#define NAND_FLAG       2
+#define FAL_BASE        SDMMC2_MEM_BASE
+
+static int sdmmc2_read(long offset, uint8_t *buf, size_t size)
+{
+    return 0;
+}
+static int sdmmc2_write(long offset, const uint8_t *buf, size_t size)
+{
+    return 0;
+}
+
+static int sdmmc2_erase(long offset, size_t size)
+{
+    return 0;
+}
+
+const struct fal_flash_dev FAL_DEV =
+{
+    .name        = FAL_NAME,
+    .addr        = FAL_BASE,
+    .len         = (FAL_SIZE >> 9),
+    .blk_size    = PAGE_SIZE,
+    .sector_size = SECTOR_SIZE,
+    .nand_flag   = NAND_FLAG,
+    .ops         = {init, sdmmc2_read, sdmmc2_write, sdmmc2_erase},
+    .write_gran  = 32
+};
+#endif /* BSP_USING_SDMMC2 */
