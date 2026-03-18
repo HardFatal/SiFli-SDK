@@ -1047,6 +1047,8 @@ struct rt_mmcsd_host *sdio_host_create(struct sifli_sdio_des *sdio_des)
     rt_mutex_init(&sdio->mutex, "sdio", RT_IPC_FLAG_FIFO);
 
     /* set host defautl attributes */
+    rt_strncpy(host->name, sdio_config.name, sizeof(host->name) - 1);
+    host->name[RT_NAME_MAX - 1] = '\0';
     host->ops = &ops;
     host->freq_min = SDIO_MIN_FREQ;
     host->freq_max = SDIO_MAX_FREQ; //SDIO_MAX_FREQ; // ??

@@ -735,6 +735,7 @@ struct rt_mmcsd_host *mmcsd_alloc_host(void)
 
     rt_memset(host, 0, sizeof(struct rt_mmcsd_host));
 
+    rt_strncpy(host->name, "sd0", sizeof(host->name) - 1);
     host->max_seg_size = 65535;
     host->max_dma_segs = 1;
     host->max_blk_size = 512;
