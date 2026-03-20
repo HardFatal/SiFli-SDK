@@ -6,10 +6,11 @@
 
 #include "rtconfig.h"
 #include "bf0_hal.h"
-#include "drv_io.h"
 #include "rtthread.h"
 #include <stdint.h>
 
+#include "ll_hpsys_cfg.h"
+#include "ll_pinmux.h"
 #include "ll_usart.h"
 
 #ifndef SF32LB52X
@@ -24,16 +25,36 @@
  */
 static void ll_usart2_pinmux_init(void)
 {
+    ll_cfg_usart_pinr_config_t pinr_cfg;
+    ll_pinmux_pad_config_t tx_pad_cfg = {
+        .fsel = 4U,
+        .pull = LL_PINMUX_PULL_UP,
+        .input_en = LL_PINMUX_INPUT_DISABLE,
+        .input_type = LL_PINMUX_INPUT_SCHMITT,
+        .slew = LL_PINMUX_SLEW_FAST,
+        .drive = LL_PINMUX_DRIVE_1,
+    };
+    ll_pinmux_pad_config_t rx_pad_cfg = tx_pad_cfg;
+
+    rx_pad_cfg.input_en = LL_PINMUX_INPUT_ENABLE;
+
 #if defined(BSP_USING_BOARD_SF32LB52_LCD_N16R8)
-    HAL_PIN_Set(PAD_PA20, USART2_RXD, PIN_PULLUP, 1);
-    HAL_PIN_Set(PAD_PA27, USART2_TXD, PIN_PULLUP, 1);
+    pinr_cfg.txd_pa = 27U;
+    pinr_cfg.rxd_pa = 20U;
 #elif defined(BSP_USING_BOARD_SF32LB52_NANO_A128R16) ||                        \
     defined(BSP_USING_BOARD_SF32LB52_NANO_N16R16)
-    HAL_PIN_Set(PAD_PA25, USART2_RXD, PIN_PULLUP, 1);
-    HAL_PIN_Set(PAD_PA28, USART2_TXD, PIN_PULLUP, 1);
+    pinr_cfg.txd_pa = 28U;
+    pinr_cfg.rxd_pa = 25U;
 #else
     #error "Please add UART2 pinmux mapping for this board."
 #endif
+
+    pinr_cfg.rts_pa = LL_CFG_PINR_FLOAT;
+    pinr_cfg.cts_pa = LL_CFG_PINR_FLOAT;
+
+    ll_cfg_config_usart2_pinr(hwp_hpsys_cfg, &pinr_cfg);
+    ll_pinmux_config_pad(hwp_pinmux1, 13U + pinr_cfg.txd_pa, &tx_pad_cfg);
+    ll_pinmux_config_pad(hwp_pinmux1, 13U + pinr_cfg.rxd_pa, &rx_pad_cfg);
 }
 
 /**
