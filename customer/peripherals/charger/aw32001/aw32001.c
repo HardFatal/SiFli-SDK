@@ -36,7 +36,7 @@ static rt_charge_device_t charge_device;
 #define AW32001_PRE_CHARGING                        1
 #define AW32001_CHARGING                            2
 #define AW32001_CHARG_FULL                          3
-#define BSP_BATTERY_USE_I2C_BUS                        "i2c2"
+
 uint8_t aw32001_get_charge_enable()
 {
     uint8_t reg = 0, ret = 0;
@@ -84,15 +84,15 @@ uint32_t aw32001_get_battery_voltage(void)
     rt_device_t dev = rt_device_find(BSP_BATTERY_DETECT_ADC);
     if (NULL == dev)
         rt_kprintf("%s failed\n", __func__);
-    rt_adc_enable((rt_adc_device_t) dev, 7);
+    rt_adc_enable((rt_adc_device_t) dev, BSP_BATTERY_DETECT_ADC_CHANNEL);
 
     HAL_LCPU_CONFIG_BATTERY_T battery_para = {0};
     uint16_t len = (uint16_t)sizeof(HAL_LCPU_CONFIG_BATTERY_T);
 
-    uint32_t voltage = rt_adc_read((rt_adc_device_t) dev, 7);
-
+    uint32_t voltage = rt_adc_read((rt_adc_device_t) dev, BSP_BATTERY_DETECT_ADC_CHANNEL);
+#if defined(AW32001_DEBUG)
     rt_kprintf("rt_adc_read:  %d;\n", voltage);
-
+#endif
 #if defined(SF32LB55X)
     voltage = ((voltage * 1220) / 220) / 10;
 #elif defined(SF32LB52X)
@@ -113,7 +113,7 @@ uint32_t aw32001_get_battery_voltage(void)
 #if defined(AW32001_DEBUG)
     rt_kprintf("%s: volt %d \n", __func__, voltage);
 #endif
-    rt_adc_disable((rt_adc_device_t) dev, 7);
+    rt_adc_disable((rt_adc_device_t) dev, BSP_BATTERY_DETECT_ADC_CHANNEL);
     return voltage;
 }
 
@@ -132,7 +132,7 @@ bool aw32001_get_charge_status(uint8_t *status)
             return RT_FALSE;
         }
     }
-    *status = reg & 0x18 >> 3;  //get bit3~bit4
+    *status = (reg & 0x18) >> 3;  //get bit3~bit4
     return RT_TRUE;
 }
 bool aw32001_get_fault_status(uint8_t *status)
@@ -233,22 +233,26 @@ rt_err_t aw32001_control(rt_charge_device_t *charge, int cmd, void *args)
             ret = RT_CHARGE_ERROR_UNSUPPORTED;
             break;
         }
-
-        rt_kprintf("aw32001_status = %d, fault = %d;\n", aw32001_status, aw32001_fault);
-        if (aw32001_fault & 0x08)
+        rt_kprintf("aw32001_status = %d, fault = 0x%x;\n", aw32001_status, aw32001_fault);
+#ifdef CHARGE_NO_BATTERY
+        if (CHARGE_NO_BATTERY)
         {
+            *status = 0;
+            break;
+        }
+#endif
+        if (aw32001_fault & 0x08)   //battery fault
+        {
+
             aw32001_charge_enable(0);
             rt_thread_mdelay(1);
             aw32001_charge_enable(1);
+
+            *status = 0;
+            break;
         }
 
-        /*when no battery or sattus is NO_CHARGING.*/
-        uint8_t no_battery = 0;
-#ifdef CHARGE_NO_BATTERY
-        if (CHARGE_NO_BATTERY)
-            no_battery = 1;
-#endif
-        if ((aw32001_status == AW32001_NO_CHARGING) || (no_battery == 1))
+        if (aw32001_status == AW32001_NO_CHARGING)
         {
             *status = 0;
         }
@@ -310,6 +314,19 @@ rt_err_t aw32001_control(rt_charge_device_t *charge, int cmd, void *args)
     {
         uint32_t *target_volt = (uint32_t *)args;
         aw32001_set_target_volt(*target_volt);
+    }
+    break;
+    case RT_CHARGE_FORCE_SUSPEND_CHARGING:
+    {
+        rt_kprintf("aw32001 suspend charging;\n");
+        aw32001_charge_enable(0);
+
+    }
+    break;
+    case RT_CHARGE_FORCE_RESUME_CHARGING:
+    {
+        rt_kprintf("aw32001 resume charging;\n");
+        aw32001_charge_enable(1);
     }
     break;
     default:
@@ -465,28 +482,7 @@ int aw32001_init(void)
     tick = tick - pre_tick;
     time = tick / HAL_LPTIM_GetFreq();
     rt_kprintf("aw32001_init ok,  time consum: %f ms.\n", time);
-    rt_err_t charge_result = aw32001_set_charge_current(100);
-    if (charge_result != RT_CHARGE_EOK)
-    {
-        rt_kprintf("Failed to set charging current %d\n", charge_result);
-    }
-    else
-    {
-        rt_kprintf("Charging current set successfully: 0.5c\n");
-    }
-
-    rt_err_t re = aw32001_set_target_volt(4200);
-    if (re != RT_EOK)
-    {
-        rt_kprintf("Failed to set charging voltage %d\n", re);
-    }
-    else
-    {
-        rt_kprintf("Charging voltage set successfully\n");
-    }
     return RT_EOK;
-
-
 }
 INIT_PREV_EXPORT(aw32001_init);
 

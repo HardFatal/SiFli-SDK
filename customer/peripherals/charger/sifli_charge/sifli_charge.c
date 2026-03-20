@@ -300,6 +300,7 @@ void sifli_charge_init(void)
     HAL_PMU_ChgConfigRepVolt(&sifli_charge_handle, CHARGE_DEFAULT_REP_VOLTAGE);
     HAL_PMU_ChgConfigVbatHighVolt(&sifli_charge_handle, CHARGE_DEFAULT_VBAT_HIGH_VOLTAGE);
     HAL_PMU_ChgConfigCcCurrent(&sifli_charge_handle, CHARGE_CC_CURRENT_LEVEL0);
+    HAL_PMU_ChgConfigEocCc(&sifli_charge_handle, CHARGE_DEFAULT_EOC_CC);
 #if defined(CHARGE_MONITOR_TEMP_CONFIG)
     HAL_TSEN_Init(&TsenHandle);
 #endif
