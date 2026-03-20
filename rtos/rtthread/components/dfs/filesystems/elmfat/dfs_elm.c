@@ -530,9 +530,33 @@ int dfs_elm_ioctl(struct dfs_fd *file, int cmd, void *args)
 {
     FIL *fd;
     int res = -ENOSYS;
-
     fd = (FIL *)(file->data);
-    if (F_GET_PHY_ADDR == cmd)
+    switch (cmd)
+    {
+    case RT_FIOFTRUNCATE:
+    {
+        FSIZE_t fptr, length;
+        FRESULT result = FR_OK;
+        RT_ASSERT(fd != RT_NULL);
+
+        /* save file read/write point */
+        fptr = fd->fptr;
+        length = *(off_t *)args;
+        if (length <= fd->obj.objsize)
+        {
+            fd->fptr = length;
+            result = f_truncate(fd);
+        }
+        else
+        {
+            result = f_lseek(fd, length);
+        }
+        /* restore file read/write point */
+        fd->fptr = fptr;
+        res = elm_result_to_dfs(result);
+        break;
+    }
+    case F_GET_PHY_ADDR:
     {
         if (args)
         {
@@ -541,14 +565,18 @@ int dfs_elm_ioctl(struct dfs_fd *file, int cmd, void *args)
                 res = 0;
             }
         }
+        break;
     }
-    else if (F_RESERVE_CONT_SPACE == cmd)
+
+    case F_RESERVE_CONT_SPACE:
     {
         FSIZE_t size = (FSIZE_t)args;
         if (FR_OK == f_expand(fd, size, 1))
         {
             res = 0;
         }
+        break;
+    }
     }
 
     return res;

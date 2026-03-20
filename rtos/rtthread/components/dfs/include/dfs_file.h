@@ -54,6 +54,8 @@ struct dfs_fd
     void *data;                  /* Specific file system data */
 };
 
+void trav_file(const char *src, uint8_t mode, char *argv);
+
 int dfs_file_open(struct dfs_fd *fd, const char *path, int flags);
 int dfs_file_close(struct dfs_fd *fd);
 int dfs_file_ioctl(struct dfs_fd *fd, int cmd, void *args);
@@ -67,6 +69,10 @@ const char *dfs_file_getext(const char *fn);
 
 int dfs_file_stat(const char *path, struct stat *buf);
 int dfs_file_rename(const char *oldpath, const char *newpath);
+int dfs_file_ftruncate(struct dfs_fd *fd, off_t length);
+
+/* 0x5254 is just a magic number to make these relatively unique ("RT") */
+#define RT_FIOFTRUNCATE 0x52540000U
 
 #ifdef __cplusplus
 }
