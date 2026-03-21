@@ -25,8 +25,13 @@
 extern "C" {
 #endif
 
-
-#define DTR_SUPPORT_FLAG        (1<<0)
+#define EXT_FLAGS_DTR_SUPPORT_FLAG_Pos    (0U)
+#define EXT_FLAGS_DTR_SUPPORT_FLAG_Msk    (0x1U << EXT_FLAGS_DTR_SUPPORT_FLAG_Pos)
+#define DTR_SUPPORT_FLAG                  EXT_FLAGS_DTR_SUPPORT_FLAG_Msk
+#define EXT_FLAGS_OTP_BASE_TYPE_Pos       (1U)
+#define EXT_FLAGS_OTP_BASE_TYPE_Msk       (0x3U << EXT_FLAGS_OTP_BASE_TYPE_Pos)
+#define EXT_FLAGS_OTP_BASE_TYPE_0         (0x0U << EXT_FLAGS_OTP_BASE_TYPE_Pos)
+#define EXT_FLAGS_OTP_BASE_TYPE_FFC000    (0x1U << EXT_FLAGS_OTP_BASE_TYPE_Pos)
 #define PLANE_SELEC_FLAG        (1<<1)
 #define BIG_PAGE_FLAG           (1<<2)
 #define BIG_BLK_FLAG            (1<<3)
@@ -91,6 +96,18 @@ typedef enum
 const SPI_FLASH_FACT_CFG_T *spi_flash_get_cmd_by_id(uint8_t fid, uint8_t did, uint8_t type);
 int spi_flash_get_size_by_id(uint8_t fid, uint8_t did, uint8_t type);
 int spi_flash_is_support_dtr(uint8_t fid, uint8_t did, uint8_t type);
+/**
+ * @brief Get the OTP base address for the specified NOR flash.
+ *
+ * Looks up the flash entry by manufacturer ID, density ID and memory type,
+ * and returns the OTP base address saved in ext_flags.
+     *
+ * @param[in] fid    manufacture id
+ * @param[in] did    low 8bit of device id, density id for NOR,
+ * @param[in] mtype  high 8bit of device id, memory type of NOR
+ * @return OTP base address
+ */
+uint32_t spi_flash_get_otp_base(uint8_t fid, uint8_t did, uint8_t mtype);
 
 const SPI_FLASH_FACT_CFG_T *spi_nand_get_cmd_by_id(uint8_t fid, uint8_t did, uint8_t type);
 const SPI_FLASH_FACT_CFG_T *spi_nand_get_default_ctable(void);

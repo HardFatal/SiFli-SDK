@@ -32,7 +32,21 @@ extern "C" {
   * @{
   */
 
-#define SPI_FLASH_OTP_BASE          (0X1000U)
+/** SPI_FLASH OTP default base address
+ *  OTP address is in range [base+start_idx*page_size, base+(start_idx+otp_page_num)*page_size))
+ */
+#define SPI_FLASH_OTP_DEFAULT_BASE      (0X0000U)
+/** SPI_FLASH OTP page start index */
+#define SPI_FLASH_OTP_PAGE_START_IDX    (1U)
+/** SPI_FLASH OTP page size in byte is equal to 2^log2_page_size */
+#define SPI_FLASH_OTP_LOG2_PAGE_SIZE    (12U)
+/** SPI_FLASH OTP page size in byte */
+#define SPI_FLASH_OTP_PAGE_SIZE         (1UL << SPI_FLASH_OTP_LOG2_PAGE_SIZE)
+
+#define SPI_FLASH_IS_VALID_OTP_ADDR_OFFSET(addr)  (((addr) >= (SPI_FLASH_OTP_PAGE_START_IDX << SPI_FLASH_OTP_LOG2_PAGE_SIZE)) && \
+                                                   ((addr) < ((SPI_FLASH_OTP_PAGE_START_IDX + hflash->ctable->mode_reg) << SPI_FLASH_OTP_LOG2_PAGE_SIZE)))
+
+#define SPI_FLASH_IS_VALID_OTP_PAGE_IDX(idx)  (((idx) >= SPI_FLASH_OTP_PAGE_START_IDX) && ((idx) < (SPI_FLASH_OTP_PAGE_START_IDX + hflash->ctable->mode_reg)))
 
 /**
   * @brief  SPI_FLASH configure tyep
@@ -263,6 +277,7 @@ typedef struct __FLASH_HandleTypeDef
     uint32_t                        reserv1;         /*!< reverved for later use and for alinged  */
     void                           *cs_ctrl;         /*!< cs control function pointer  */
     void                           *lock;
+    uint32_t                        otp_base;        /*!< OTP base address for nor, reserved for nand  */
     const void                      *ext_cfg;        /*!< pointer to NAND or NOR extended configuration
                                                       *  NAND: nand_ext_cfg_t
                                                       *  NOR: nor_ext_cfg_t
@@ -825,6 +840,11 @@ int HAL_FLASH_DEEP_PWRDOWN(FLASH_HandleTypeDef *hflash);
  * @retval 0 if success
 */
 int HAL_FLASH_RELEASE_DPD(FLASH_HandleTypeDef *hflash);
+
+static inline uint32_t HAL_FLASH_GetOtpBase(FLASH_HandleTypeDef *handle)
+{
+    return handle->otp_base;
+}
 
 
 /**

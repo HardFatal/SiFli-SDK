@@ -32,7 +32,21 @@ extern "C" {
   * @{
   */
 
-#define SPI_FLASH_OTP_BASE          (0X1000U)
+/** SPI_FLASH OTP default base address
+ *  OTP address is in range [base+start_idx*page_size, base+(start_idx+otp_page_num)*page_size))
+ */
+#define SPI_FLASH_OTP_DEFAULT_BASE      (0X0000U)
+/** SPI_FLASH OTP page start index */
+#define SPI_FLASH_OTP_PAGE_START_IDX    (1U)
+/** SPI_FLASH OTP page size in byte is equal to 2^log2_page_size */
+#define SPI_FLASH_OTP_LOG2_PAGE_SIZE    (12U)
+/** SPI_FLASH OTP page size in byte */
+#define SPI_FLASH_OTP_PAGE_SIZE         (1UL << SPI_FLASH_OTP_LOG2_PAGE_SIZE)
+
+#define SPI_FLASH_IS_VALID_OTP_ADDR_OFFSET(addr)  (((addr) >= (SPI_FLASH_OTP_PAGE_START_IDX << SPI_FLASH_OTP_LOG2_PAGE_SIZE)) && \
+                                                   ((addr) < ((SPI_FLASH_OTP_PAGE_START_IDX + hflash->ctable->mode_reg) << SPI_FLASH_OTP_LOG2_PAGE_SIZE)))
+
+#define SPI_FLASH_IS_VALID_OTP_PAGE_IDX(idx)  (((idx) >= SPI_FLASH_OTP_PAGE_START_IDX) && ((idx) < (SPI_FLASH_OTP_PAGE_START_IDX + hflash->ctable->mode_reg)))
 
 /* TODO: confirm whether 100MHz can be used by all chips.
  *  Actually this value only affects the config when reading ID, after reading ID, MPI_MISCR_RXCLKINV will always be changed to 0.
@@ -299,6 +313,7 @@ typedef struct __FLASH_HandleTypeDef
     uint8_t                         wakeup;          /*!< wake up mode for psram, plane select flag for nand */
     uint32_t                        reserv1;         /*!< used as local clock divider for dual flash  */
     flash_cs_ctrl                   cs_ctrl;         /*!< cs control function pointer  */
+    uint32_t                        otp_base;        /*!< OTP base address for nor, reserved for nand  */
 
     const void                      *ext_cfg;        /*!< pointer to NAND or NOR extended configuration
                                                       *  NAND: nand_ext_cfg_t
@@ -1024,6 +1039,12 @@ HAL_StatusTypeDef HAL_MPI_CFG_PREFETCH(FLASH_HandleTypeDef *hflash, uint32_t sta
  * @retval HAL status
 */
 HAL_StatusTypeDef HAL_MPI_EN_PREFETCH(FLASH_HandleTypeDef *hflash, uint8_t en);
+
+
+static inline uint32_t HAL_FLASH_GetOtpBase(FLASH_HandleTypeDef *handle)
+{
+    return handle->otp_base;
+}
 
 /**
   * @}

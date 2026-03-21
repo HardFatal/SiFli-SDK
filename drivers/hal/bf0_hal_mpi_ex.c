@@ -237,7 +237,12 @@ __HAL_ROM_USED HAL_StatusTypeDef HAL_FLASH_Init(QSPI_FLASH_CTX_T *ctx, qspi_conf
 #endif
     {
         size = spi_flash_get_size_by_id(fid, did, mtype);
+        hflash->otp_base = spi_flash_get_otp_base(fid, did, mtype);
         hflash->ext_cfg = spi_nor_get_ext_cfg_by_id(fid, did, mtype);
+        if (hflash->ext_cfg)
+        {
+            hflash->otp_base = ((nor_ext_cfg_t *)(hflash->ext_cfg))->otp_base;
+        }
     }
 
     if (size != 0)  // use size from table to replace configure size
@@ -2535,23 +2540,31 @@ __HAL_ROM_USED int HAL_QSPI_ERASE_OTP(FLASH_HandleTypeDef *hflash, uint32_t addr
     uint16_t dlen;
     int res, opbit;
     uint32_t param;
+    uint32_t otp_base;
 
     if (hflash == NULL || hflash->ctable == NULL)
         return -1;
-    if (addr < SPI_FLASH_OTP_BASE || addr > SPI_FLASH_OTP_BASE + (hflash->ctable->mode_reg << 12))
-        return -1;
 
-    srh = HAL_QSPI_GET_OTP_LB(hflash, addr);
+    otp_base = HAL_FLASH_GetOtpBase(hflash);
+    if (!SPI_FLASH_IS_VALID_OTP_ADDR_OFFSET(addr))
+    {
+        return -1;
+    }
+
+    srh = HAL_QSPI_GET_OTP_LB(hflash);
     //rt_kprintf("srh = %d\n", srh);
-    opbit = addr >> 12;
-    if (opbit < 1 || opbit > hflash->ctable->mode_reg)
+    opbit = addr >> SPI_FLASH_OTP_LOG2_PAGE_SIZE;
+    if (!SPI_FLASH_IS_VALID_OTP_PAGE_IDX(opbit))
+    {
         return -1;
-    opbit = 1 << (opbit - 1);
+    }
+    opbit = 1 << (opbit - SPI_FLASH_OTP_PAGE_START_IDX);
     if (opbit & srh) // this security register has been locked, can not erase any more
+    {
         return -2;
-    //rt_kprintf("opbit = %d\n", opbit);
+    }
 
-    addr = addr;
+    addr = addr + otp_base;
     HAL_FLASH_ISSUE_CMD(hflash, SPI_FLASH_CMD_WREN, 0);
 #ifdef QSPI_USE_CMD2
     dlen = 1;
@@ -2585,23 +2598,33 @@ __HAL_ROM_USED int HAL_QSPI_WRITE_OTP(FLASH_HandleTypeDef *hflash, uint32_t addr
     int res, opbit;
     HAL_StatusTypeDef ret;
     uint32_t param;
+    uint32_t otp_base;
 
     if (hflash == NULL || hflash->ctable == NULL)
         return 0;
-    if (addr < SPI_FLASH_OTP_BASE || addr > SPI_FLASH_OTP_BASE + (hflash->ctable->mode_reg << 12))
+
+    otp_base = HAL_FLASH_GetOtpBase(hflash);
+    if (!SPI_FLASH_IS_VALID_OTP_ADDR_OFFSET(addr))
+    {
         return 0;
+    }
 
     if ((addr & 0x3ff) + size   > hflash->ctable->oob_size * 256)
         return 0;
 
-    srh = HAL_QSPI_GET_OTP_LB(hflash, addr);
-    opbit = addr >> 12;
-    if (opbit < 1 || opbit > hflash->ctable->mode_reg)
+    srh = HAL_QSPI_GET_OTP_LB(hflash);
+    opbit = addr >> SPI_FLASH_OTP_LOG2_PAGE_SIZE;
+    if (!SPI_FLASH_IS_VALID_OTP_PAGE_IDX(opbit))
+    {
         return 0;
-    opbit = 1 << (opbit - 1);
+    }
+    opbit = 1 << (opbit - SPI_FLASH_OTP_PAGE_START_IDX);
     if (opbit & srh) // this security register has been locked, can not write any more
+    {
         return 0;
+    }
 
+    addr += otp_base;
     if (hflash->dma != NULL)
     {
         // add pre command process to make FLASH as write mode , to avoid prev read error.

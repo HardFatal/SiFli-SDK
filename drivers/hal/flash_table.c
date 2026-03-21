@@ -672,6 +672,31 @@ int spi_flash_is_support_dtr(uint8_t fid, uint8_t did, uint8_t type)
     return res;
 }
 
+uint32_t spi_flash_get_otp_base(uint8_t fid, uint8_t did, uint8_t mtype)
+{
+    uint32_t otp_base;
+
+    FT_CONST FLASH_RDID_TYPE_T *rdid = spi_flash_get_rdid(fid, did, mtype, NULL);
+    if (rdid)
+    {
+        if (EXT_FLAGS_OTP_BASE_TYPE_FFC000 == (rdid->ext_flags & EXT_FLAGS_OTP_BASE_TYPE_Msk))
+        {
+            otp_base = 0xFFC000;
+        }
+        else
+        {
+            otp_base = SPI_FLASH_OTP_DEFAULT_BASE;
+        }
+    }
+    else
+    {
+        otp_base = SPI_FLASH_OTP_DEFAULT_BASE;
+    }
+
+    return otp_base;
+}
+
+
 
 __WEAK const nor_ext_cfg_t *spi_nor_get_ext_cfg_by_id(uint8_t fid, uint8_t did, uint8_t mtype)
 {
