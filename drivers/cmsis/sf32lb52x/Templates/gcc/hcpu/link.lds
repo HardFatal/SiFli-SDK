@@ -198,6 +198,11 @@ SECTIONS
 #endif /* BSP_QSPI2_DUAL_MODE */
 
     . = ALIGN(4);
+    __nor_cfg_db_start__ = .;
+    KEEP(*(.nor_cfg_db))
+    __nor_cfg_db_end__ = .;
+
+    . = ALIGN(4);
     __RW_IRAM_RET$$RW_start__ = .;
 
     *.o (.retm_data_*)

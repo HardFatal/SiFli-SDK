@@ -238,6 +238,11 @@ SECTIONS
     *(.l1_non_ret_rodata_*)
 
     . = ALIGN(4);
+    __nor_cfg_db_start__ = .;
+    KEEP(*(.nor_cfg_db))
+    __nor_cfg_db_end__ = .;
+
+    . = ALIGN(4);
     __rw_rom_ex_end__ = .;
     __ER_IROM1_EX$$RO_end__ = .;
     __ER_IROM1_EX$$RO_load_end__ = LOADADDR(.rom_ex) + SIZEOF(.rom_ex);

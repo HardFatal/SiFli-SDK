@@ -161,7 +161,7 @@ SECTIONS
     __rw_retm_data_start__ = .;
     * (.*l1_ret_text_*)
     * (.*l1_ret_rodata_*)
-
+    
  #ifdef BSP_USING_NOR_FLASH3
     *drv_spi_flash.o     (.text* .rodata*)
 #endif /* BSP_USING_NOR_FLASH3 */
@@ -198,6 +198,11 @@ SECTIONS
     *drv_common.o       (.text.rt_hw_us_delay)
     *.o                 (.text.rt_memset)
     *.o                 (.text.memset)
+
+    . = ALIGN(4);
+    __nor_cfg_db_start__ = .;
+    KEEP(*(.nor_cfg_db))
+    __nor_cfg_db_end__ = .;
 
     . = ALIGN(4);
     __RW_IRAM_RET$$RW_start__ = .;
