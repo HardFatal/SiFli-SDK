@@ -63,6 +63,10 @@ extensions:
     ignore_license: true
     ignore_copyright: true
   - path:
+      "external/freetype"
+    license:
+      - FTL
+  - path:
       "external/libhelix-mp3"
     license:
       - RCSL-1.2

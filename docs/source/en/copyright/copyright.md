@@ -58,7 +58,7 @@ The following third-party libraries may be included in applications (firmware) g
 
 23. wpa_supplicant-rtos: Copyright 2003-2022 Jouni Malinen <j@w1.fi> and all contributors, licensed under a BSD-style license.
 
-24. [FreeType](https://www.freetype.org): Copyright 1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg, licensed under the FreeType Project License (see LICENSE.TXT file in the component for details).
+24. [FreeType](https://www.freetype.org): Copyright 1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg, licensed under FTL license (see FTL.TXT file in the component for details).
 
 25. nanopb: Copyright 2014 Petteri Aimonen <jpa@kapsi.fi>, licensed under the MIT License.
 

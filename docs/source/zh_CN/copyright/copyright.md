@@ -58,7 +58,7 @@
 
 23. wpa_supplicant-rtos：版权归 2003-2022 Jouni Malinen <j@w1.fi> 和所有贡献者所有，根据 BSD 风格许可协议进行许可。
 
-24. [FreeType](https://www.freetype.org)：版权归 1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg 所有，依据 FreeType 项目专属许可（详情参阅组件内 LICENSE.TXT 文件）进行许可 。
+24. [FreeType](https://www.freetype.org)：版权归 1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg 所有，依据 FTL 协议（详情参阅组件内 FTL.TXT 文件）进行许可 。
 
 25. nanopb：版权归 2014 Petteri Aimonen <jpa@kapsi.fi>  所有，根据 MIT License 进行许可。
 
