@@ -10,6 +10,10 @@
 #include <rtconfig.h>
 #include <board.h>
 
+#ifdef PKG_USING_FLASHDB
+#include "fdb_def.h"
+#endif
+
 #define FAL_PART_HAS_TABLE_CFG
 
 #ifndef NOR_FLASH1_DEV_NAME
@@ -36,22 +40,39 @@
     #define SDMMC2_DEV_NAME                 "sd1"
 #endif /* SDMMC2_DEV_NAME */
 
+#if defined (SOLUTION)
+#define FAL_PART_DEF(flash_part_id)      \
+    {FAL_PART_MAGIC_WORD,                \
+     FLASH_PART_NAME(flash_part_id),     \
+     FLASH_PART_DEVICE(flash_part_id),   \
+     FLASH_PART_RESET(flash_part_id),    \
+     FLASH_PART_PATH(flash_part_id),     \
+     FLASH_PART_OFFSET(flash_part_id),   \
+     FLASH_PART_SIZE(flash_part_id), 0}
+#define FAL_FS_PART_DEF(flash_part_id)   \
+    {FAL_PART_MAGIC_WORD,                \
+     FLASH_PART_NAME(flash_part_id),     \
+     FLASH_PART_DEVICE(flash_part_id),   \
+     FLASH_PART_RESET(flash_part_id),    \
+     FLASH_PART_PATH(flash_part_id),     \
+     FLASH_PART_OFFSET(flash_part_id),   \
+     FLASH_PART_SIZE(flash_part_id), FAL_FS_PART_FLAG}
+#else
 #define FAL_PART_DEF(flash_part_id)      \
     {FAL_PART_MAGIC_WORD,                \
      FLASH_PART_NAME(flash_part_id),     \
      FLASH_PART_DEVICE(flash_part_id),   \
      FLASH_PART_OFFSET(flash_part_id),   \
      FLASH_PART_SIZE(flash_part_id), 0}
-
-
-#define FAL_FS_PART_FLAG                 (1)
-
 #define FAL_FS_PART_DEF(flash_part_id)   \
     {FAL_PART_MAGIC_WORD,                \
      FLASH_PART_NAME(flash_part_id),     \
      FLASH_PART_DEVICE(flash_part_id),   \
      FLASH_PART_OFFSET(flash_part_id),   \
      FLASH_PART_SIZE(flash_part_id), FAL_FS_PART_FLAG}
+#endif
+
+#define FAL_FS_PART_FLAG                 (1)
 
 /* partition magic word */
 #define FAL_PART_MAGIC_WORD         0x45503130
@@ -81,7 +102,7 @@ extern const struct fal_flash_dev fal_sdmmc2;
 
 /* ====================== Partition Configuration ========================== */
 #ifdef FAL_PART_HAS_TABLE_CFG
-#ifndef SOLUTION_WATCH
+#ifndef SOLUTION
 /* customized FAL_PART_TABLE can be defined in board.h */
 #ifndef FAL_PART_TABLE
 /* partition table */
@@ -94,7 +115,7 @@ extern const struct fal_flash_dev fal_sdmmc2;
 #endif /* !FAL_PART_TABLE */
 #else
 #include "flash_map.h"
-#endif /* !SOLUTION_WATCH */
+#endif /* !SOLUTION */
 #endif /* FAL_PART_HAS_TABLE_CFG */
 
 #endif /* _FAL_CFG_H_ */
