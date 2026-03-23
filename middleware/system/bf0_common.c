@@ -856,6 +856,10 @@ __ROM_USED int lcpu(int argc, char **argv)
             //HAL_RCC_LCPU_reset(LPSYS_RCC_RSTR1_LCPU, 1);    // Enable reset
             lcpu_power_off();
         }
+        else if (strcmp("sleep", argv[1]) == 0)
+        {
+            HAL_LPAON_Sleep();
+        }
         else if (strcmp("wakeup", argv[1]) == 0)
         {
             uint8_t is_on = (uint8_t)atoi(argv[2]);
