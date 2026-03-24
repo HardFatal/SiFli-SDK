@@ -1862,4 +1862,8 @@ menu "On-chip Peripheral RTOS Drivers"
              HAL API is used instead of rt device driver, so module cannot be disabled
         default n
 
+    config BSP_USING_SYS_CFG
+        bool "SYS CFG Module"
+        depends on BF0_LCPU 
+        default n
 endmenu
