@@ -40,6 +40,9 @@
 #ifndef FFMPEG_NAND_URL_FMT
     #define FFMPEG_NAND_URL_FMT "nand://addr=0x%x&len=0x%x"
 #endif
+#ifndef FFMPEG_RAM_URL_FMT
+    #define FFMPEG_RAM_URL_FMT "ram://addr=0x%x&len=0x%x"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,15 +65,20 @@ extern "C" {
 #endif
 
 #if IMG_DESC_USING_FFMPEG_YUV420P_BUFFER
-#define IMG_DESC_FMT            IMG_DESC_FMT_YUV420P
-#define IMG_PIXEL_SIZE          2
-#define IMG_LV_FMT              LV_IMG_CF_YUV420_PLANAR2
+#define IMG_DESC_FMT                IMG_DESC_FMT_YUV420P
+#define IMG_PIXEL_SIZE              2
+#define IMG_LV_FMT                  LV_IMG_CF_YUV420_PLANAR2
 #else
-#if LV_COLOR_DEPTH == 24 && defined (BSP_USING_PC_SIMULATOR)
+#if defined(BSP_USING_PC_SIMULATOR)
+#if (LV_COLOR_DEPTH == 24)
 #define IMG_DESC_FMT        IMG_DESC_FMT_RGB888
-#define IMG_PIXEL_SIZE      (LV_COLOR_SIZE>>3)
-#define IMG_LV_FMT          LV_IMG_CF_TRUE_COLOR
-#elif defined(SOC_SF32LB58X) //HW jpeg not support RGB888 on 58x
+#else
+#define IMG_DESC_FMT        IMG_DESC_FMT_RGB565
+#endif
+#define IMG_PIXEL_SIZE          (LV_COLOR_SIZE>>3)
+#define IMG_LV_FMT              LV_IMG_CF_TRUE_COLOR
+#else
+#if (LV_COLOR_DEPTH == 24) && defined(SOC_SF32LB58X) //HW jpeg not support RGB888 on 58x
 #define IMG_DESC_FMT        IMG_DESC_FMT_ARGB8888
 #define IMG_PIXEL_SIZE      4
 #ifndef DISABLE_LVGL_V8
@@ -81,9 +89,6 @@ extern "C" {
 #else
 #define IMG_DESC_FMT        IMG_DESC_FMT_RGB565
 #define IMG_PIXEL_SIZE      2
-#ifdef  BSP_USING_PC_SIMULATOR
-#define IMG_LV_FMT          LV_IMG_CF_TRUE_COLOR
-#else
 #define IMG_LV_FMT          LV_IMG_CF_RGB565
 #endif
 #endif
@@ -133,12 +138,14 @@ typedef struct
     ffmpeg_src_e    src;          //must be e_src_localfile now
     int             fmt_ctx_flag; //ffmpeg AVFMT_FLAG_*  map, in avformat.h. notw used now, should be zero
     uint8_t         fmt;          //dest image format. shoul be IMG_DESC_FMT_* in this file
+    uint8_t         is_wait_for_resume; //only decode 2 frame , then auto pause, app should call ffmpeg_resume() to continue
     uint8_t         is_loop;      //audio loop again if set to 1
     uint8_t         audio_enable; //enable audio in media file if set to 1
     uint8_t         video_enable; //enable video in meida file if set to 1
     const char     *file_path;   /*if src is e_src_localbuffer, should be type + address + len
                                   example:
                                   nand://addr=0x63000abcd&len=0x12bce
+                                  ram://addr=0x20000abcd&len=0x12bce
                                   /video/test.mp4
                                   http://xxxx.com/test.mp4
                                   https://xxxx.com/test.mp4
@@ -329,6 +336,14 @@ bool ffmpeg_is_video_available(ffmpeg_handle hanlde);
  */
 ffmpeg_handle ffmpeg_player_status_get(void);
 
+/**
+ * Set whether to wait for the video buffer to be completely filled before reading video frames.
+ * @param thiz FFmpeg handle
+ * @param is_wait Flag indicating whether to wait for buffer full
+ *                - 0: Do not wait, process existing frames immediately
+ *                - 1: Wait until the buffer is completely filled before processing
+*/
+void ffmpeg_set_is_wait_video_full(ffmpeg_handle thiz, uint8_t is_wait);
 
 #ifdef __cplusplus
 }
