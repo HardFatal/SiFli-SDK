@@ -344,6 +344,12 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct rt_mmcsd_data *da
             {
                 //sdhci_writel(host, host->adma_addr,
                 //             SDHCI_ADMA_ADDRESS);
+#if !defined(SF32LB55X)
+                if (HCPU_IS_MPI_CBUS_ADDR(data->buf))
+                {
+                    data->buf = (void *)HCPU_MPI_SBUS_ADDR((uint32_t)data->buf);
+                }
+#endif
                 hal_sdhic_set_adma_addr(&host->handle, host->adma_addr);
                 LOG_D("ADMA 0x%0x, addr 0x%08x, len %d\n", host->adma_addr, *((uint32_t *)(host->adma_desc + 4)), *((uint16_t *)(host->adma_desc + 2)));
             }
