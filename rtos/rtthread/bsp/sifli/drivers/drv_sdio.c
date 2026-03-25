@@ -1522,6 +1522,34 @@ int rt_hw_sdio_init(void)
 #else
     LOG_I("SDIO USING POLLING MODE !\n");
 #endif
+#ifdef RT_USING_PM
+    // if (PM_STANDBY_BOOT != SystemPowerOnModeGet())  // standby do noct destory event/mutex, can not init again
+    {
+#ifdef PM_STANDBY_ENABLE
+        rt_sdio_register_rt_device();
+#endif
+        rt_pm_request(PM_SLEEP_MODE_IDLE);
+        rt_pm_hw_device_start();
+        uint32_t time_out = 3000;
+#if defined(SD_INSERT_DETECT_PIN) && (SD_INSERT_DETECT_PIN != -1)
+        if (!sdio_card_inserted)
+            time_out = 1;
+#endif
+        while (time_out--)
+        {
+            rt_thread_mdelay(1);
+            uint8_t mmcsd_get_stat(void);
+            if (mmcsd_get_stat()) break;
+        }
+        rt_pm_release(PM_SLEEP_MODE_IDLE);
+        rt_uint8_t priority = RT_MMCSD_THREAD_PREORITY;
+        if (mmcsd_get_thread())
+            rt_thread_control(mmcsd_get_thread(), RT_THREAD_CTRL_CHANGE_PRIORITY, &priority);
+
+        rt_pm_hw_device_stop();
+
+    }
+#endif /* RT_USING_PM */
 
     return 0;
 }
