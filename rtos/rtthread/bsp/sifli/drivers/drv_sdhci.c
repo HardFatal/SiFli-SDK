@@ -32,7 +32,7 @@
 
 #if defined(SD_INSERT_DETECT_PIN) && (SD_INSERT_DETECT_PIN != -1)
     static uint8_t sdhci_card_inserted = 0; // 0: not inserted, 1: inserted
-#endif
+#endif /* SD_INSERT_DETECT_PIN */
 
 static void sdhci_prepare_data(struct sdhci_host *host, struct rt_mmcsd_data *data);
 static void sdhci_finish_data(struct sdhci_host *host);
@@ -1154,13 +1154,6 @@ static void sdhci_data_irq(struct sdhci_host *host, uint32_t intmask)
     }
 }
 
-//static void sdhci_isr(void *handle)
-//{
-//    struct sdhci_host *host = handle;
-//    uint32_t intstatus = sdhci_readl(host, SDHCI_INT_STATUS);
-//    LOG_D("sdhci_isr 0x%x\n",intstatus);
-//    rt_event_send(&host->event, intstatus);
-//}
 
 static int sdhci_irq(void *dev)
 {
@@ -1667,24 +1660,6 @@ int sdhci_add_host(struct sdhci_host *host)
 
     hal_sdhci_enable_card_detection(&host->handle);
 
-    // clear buffer before start
-    //sdhci_readl(host, SDHCI_BUFFER);
-
-    // set debug port
-#if 0
-//#define SD_DEBUG_PORT          (1)
-    /* FOR USB DEBUG PORT */
-    {
-        volatile uint32_t *hdbg = (volatile uint32_t *)0x4000001C;
-        *hdbg = 0XFF01FF01;
-        //*hdbg = (0xff << 24) | (1 << 16) | (0xff << 8) | (1 << 0);
-        //hwp_hpsys_rcc->DBGR = (0xff << 24) | (SD_DEBUG_PORT << 16) | (0xff << 8) | (SD_DEBUG_PORT << 0);
-
-        // hpcd->Instance->DBG_OUT_SEL |= ((1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) ;
-
-    }
-#endif
-
     // TODO: disable check condition as solution does, but don't know why
     //if (PM_STANDBY_BOOT != SystemPowerOnModeGet())  // standby do noct destory event/mutex, can not init again
     {
@@ -1714,7 +1689,7 @@ int sdhci_add_host(struct sdhci_host *host)
     }
 #else
     mmcsd_change(mmc);/* ready to change */
-#endif
+#endif /* SD_INSERT_DETECT_PIN */
 
     LOG_I("Add host success\n");
 
@@ -1987,7 +1962,28 @@ int rt_sdhci_init_instance(uint8_t id)
 #endif /* RT_USING_PM */
 
     LOG_I("rt_hw_sdmmc_init %d done\n", id + 1);
+#ifdef RT_USING_PM
+    // if (PM_STANDBY_BOOT != SystemPowerOnModeGet())  // standby do noct destory event/mutex, can not init again
+    {
+        rt_pm_request(PM_SLEEP_MODE_IDLE);
+        rt_pm_hw_device_start();
+        uint16_t sdhci_time = 100;
+#if defined(SD_INSERT_DETECT_PIN) && (SD_INSERT_DETECT_PIN != -1)
+        if (sdhci_card_inserted == 0)
+            sdhci_time = 1;
+#endif /* SD_INSERT_DETECT_PIN */
+        while (sdhci_time --)
+        {
+            rt_thread_mdelay(30);
+            uint8_t mmcsd_get_stat(void);
+            if (mmcsd_get_stat()) break;
+        }
 
+        rt_pm_release(PM_SLEEP_MODE_IDLE);
+
+        rt_pm_hw_device_stop();
+    }
+#endif /* RT_USING_PM */
     return 0;
 }
 
