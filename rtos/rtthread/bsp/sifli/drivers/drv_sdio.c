@@ -1490,6 +1490,8 @@ static void rt_sdio_register_rt_device(void)
 int rt_hw_sdio_init(void)
 {
     struct sifli_sdio_des sdio_des;
+    rt_uint8_t priority = RT_MMCSD_THREAD_PREORITY;
+
 #ifdef SF32LB52X
     HAL_RCC_EnableModule(RCC_MOD_SDMMC1);
 #else
@@ -1542,14 +1544,15 @@ int rt_hw_sdio_init(void)
             if (mmcsd_get_stat()) break;
         }
         rt_pm_release(PM_SLEEP_MODE_IDLE);
-        rt_uint8_t priority = RT_MMCSD_THREAD_PREORITY;
-        if (mmcsd_get_thread())
-            rt_thread_control(mmcsd_get_thread(), RT_THREAD_CTRL_CHANGE_PRIORITY, &priority);
-
         rt_pm_hw_device_stop();
 
     }
 #endif /* RT_USING_PM */
+
+    if (mmcsd_get_thread())
+    {
+        rt_thread_control(mmcsd_get_thread(), RT_THREAD_CTRL_CHANGE_PRIORITY, &priority);
+    }
 
     return 0;
 }

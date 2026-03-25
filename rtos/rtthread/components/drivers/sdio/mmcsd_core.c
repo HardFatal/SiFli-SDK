@@ -753,6 +753,15 @@ void mmcsd_free_host(struct rt_mmcsd_host *host)
     rt_sem_detach(&host->sem_ack);
     rt_free(host);
 }
+#ifdef GUI_THREAD_TEMP_PRIO
+    #define RT_MMCSD_THREAD_INIT_PREORITY   GUI_THREAD_TEMP_PRIO
+#else
+    #define RT_MMCSD_THREAD_INIT_PREORITY   RT_THREAD_PRIORITY_HIGH - 3
+#endif
+rt_thread_t mmcsd_get_thread(void)
+{
+    return mmcsd_detect_thread.name[0] ? &mmcsd_detect_thread : NULL;
+}
 
 int rt_mmcsd_core_init(void)
 {
@@ -770,7 +779,7 @@ int rt_mmcsd_core_init(void)
                      RT_IPC_FLAG_FIFO);
     RT_ASSERT(ret == RT_EOK);
     ret = rt_thread_init(&mmcsd_detect_thread, "mmcsd_detect", mmcsd_detect, RT_NULL,
-                         &mmcsd_stack[0], RT_MMCSD_STACK_SIZE, RT_MMCSD_THREAD_PREORITY, 20);
+                         &mmcsd_stack[0], RT_MMCSD_STACK_SIZE, RT_MMCSD_THREAD_INIT_PREORITY, 20);
     if (ret == RT_EOK)
     {
         rt_thread_startup(&mmcsd_detect_thread);
