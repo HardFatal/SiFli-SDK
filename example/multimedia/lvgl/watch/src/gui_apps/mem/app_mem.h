@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 SiFli Technologies(Nanjing) Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 /**
  * @file app_mem.h
  *
@@ -29,6 +35,17 @@ typedef enum
     IMAGE_CACHE_PSRAM
 } image_cache_t;
 
+#ifndef CACHE_HEAP
+#define CACHE_HEAP IMAGE_CACHE_HEAP
+#endif
+
+#ifndef CACHE_SRAM
+#define CACHE_SRAM IMAGE_CACHE_SRAM
+#endif
+
+#ifndef CACHE_PSRAM
+#define CACHE_PSRAM IMAGE_CACHE_PSRAM
+#endif
 
 /**
 @brief apply cache mem for solution applicaiton.

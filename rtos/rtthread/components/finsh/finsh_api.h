@@ -211,18 +211,18 @@ struct finsh_syscall *finsh_syscall_lookup(const char *name);
     FINSH_FUNCTION_EXPORT_CMD(command, __cmd_##command, desc)
 #define MSH_CMD_EXPORT_ALIAS(command, alias, desc)  \
     FINSH_FUNCTION_EXPORT_ALIAS(command, __cmd_##alias, desc)
-#endif /* MSH_CMD_SLIM */
+#endif
 #define MSH_CMD_EXPORT_REL(command, alias, desc)  \
     FINSH_FUNCTION_EXPORT_ALIAS(command, __cmd_##alias, desc)
-#endif /* FINSH_USING_MSH */
+#endif
 #ifndef MSH_CMD_EXPORT
-    #define MSH_CMD_EXPORT(command, desc)
-#endif /* !MSH_CMD_EXPORT */
+#define MSH_CMD_EXPORT(command, desc)
+#endif
 #ifndef MSH_CMD_EXPORT_ALIAS
-    #define MSH_CMD_EXPORT_ALIAS(command, alias, desc)
-#endif /* !MSH_CMD_EXPORT_ALIAS */
+#define MSH_CMD_EXPORT_ALIAS(command, alias, desc)
+#endif
 #ifndef MSH_CMD_EXPORT_REL
     #define MSH_CMD_EXPORT_REL(command, alias, desc)
-#endif /* !MSH_CMD_EXPORT_REL */
+#endif
 
 #endif

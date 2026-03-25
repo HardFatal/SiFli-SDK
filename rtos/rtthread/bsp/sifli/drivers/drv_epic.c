@@ -233,6 +233,7 @@ typedef struct
     struct rt_thread task;
     rt_mq_t  mq;
     uint8_t task_idle; //1: task is idle, 0: task is busy
+    drv_epic_rotate_t rotated;
 
 #endif /* DRV_EPIC_NEW_API */
 
@@ -5747,6 +5748,17 @@ rt_err_t drv_epic_render_trav(drv_epic_render_list_t list, drv_epic_render_trav_
     }
 
     return RT_EOK;
+}
+
+rt_err_t drv_epic_set_rotation(drv_epic_rotate_t rotate)
+{
+    drv_epic.rotated = rotate;
+    return RT_EOK;
+}
+
+drv_epic_rotate_t drv_epic_get_rotation(void)
+{
+    return drv_epic.rotated;
 }
 
 #endif /*DRV_EPIC_NEW_API*/
