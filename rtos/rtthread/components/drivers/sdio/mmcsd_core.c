@@ -78,9 +78,14 @@ void mmcsd_send_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
                 req->stop->mrq = req;
             }
         }
+        /* serialize accesses to the host to avoid concurrent requests
+         * which may overwrite host->cmd / host->data in the controller
+         */
+        mmcsd_host_lock(host);
         host->ops->request(host, req);
 
         rt_sem_take(&host->sem_ack, RT_WAITING_FOREVER);
+        mmcsd_host_unlock(host);
 
     }
     while (req->cmd->err && (req->cmd->retries > 0));
