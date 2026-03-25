@@ -86,7 +86,7 @@ char * lv_strncpy(char * dst, const char * src, size_t dest_size)
 
 char * lv_strcpy(char * dst, const char * src)
 {
-    return rt_strcpy(dst, src);
+    return rt_strncpy(dst, src, rt_strlen(src) + 1);
 }
 
 int lv_strcmp(const char * s1, const char * s2)
