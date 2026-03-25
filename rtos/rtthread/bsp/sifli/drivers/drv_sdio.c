@@ -42,6 +42,9 @@ int rthw_sdio_irq_process(struct rt_mmcsd_host *host);
 static struct sifli_sdio_config sdio_config = SDIO_BUS_CONFIG;
 static struct sifli_sdio_class sdio_obj;
 static struct rt_mmcsd_host *sdio_host;
+#if defined(SD_INSERT_DETECT_PIN) && (SD_INSERT_DETECT_PIN != -1)
+    static uint8_t sdio_card_inserted = 0; // 0: not inserted, 1: inserted
+#endif /* SD_INSERT_DETECT_PIN */
 #ifdef RT_USING_PM
     static struct rt_device rt_sdio_device;
 #endif /* RT_USING_PM */
@@ -1105,9 +1108,29 @@ struct rt_mmcsd_host *sdio_host_create(struct sifli_sdio_des *sdio_des)
     sdio->part_offset = 0;
 
     rthw_sdio_irq_update(host, 1);
-
-    /* ready to change */
+#if defined(SD_INSERT_DETECT_PIN) && (SD_INSERT_DETECT_PIN != -1)
+    rt_pin_mode(SD_INSERT_DETECT_PIN, PIN_MODE_INPUT);
+    int card_state = rt_pin_read(SD_INSERT_DETECT_PIN);
+    rt_thread_mdelay(10);
+    if (card_state == rt_pin_read(SD_INSERT_DETECT_PIN))
+    {
+        if (card_state)
+        {
+            rt_kprintf("[SD] no card (pin %d), skip drv_sdio\n", SD_INSERT_DETECT_PIN);
+            sdio_card_inserted = 0;
+            return RT_EOK;
+        }
+        else
+        {
+            sdio_card_inserted = 1;
+            mmcsd_change(host);
+        }
+    }
+#else
     mmcsd_change(host);
+#endif /* SD_INSERT_DETECT_PIN */
+    /* ready to change */
+
 
     return host;
 }
