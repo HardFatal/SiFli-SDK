@@ -259,7 +259,8 @@ void rt_mmcsd_blk_remove(struct rt_mmcsd_card *card);
 void rt_mmcsd_blk_device_create(const char *dev_name, const char *part_name, size_t offset, size_t size);
 int rt_sdio_read(uint32_t addr, uint8_t *buf, int size);
 int rt_sdio_write(uint32_t addr, uint8_t *buf, int size);
-
+void  rt_mmcsd_lock(void);
+void  rt_mmcsd_unlock(void);
 uint32_t rt_mmcsd_irq_disable(void);
 
 #ifdef __cplusplus

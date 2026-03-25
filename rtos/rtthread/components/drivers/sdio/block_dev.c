@@ -63,6 +63,18 @@ struct mmcsd_blk_device
     #define RT_MMCSD_MAX_PARTITION 16
 #endif
 
+
+void  rt_mmcsd_lock(void)
+{
+    if (sdio_mutex.parent.parent.name[0])
+        rt_mutex_take(&sdio_mutex, RT_WAITING_FOREVER);
+}
+void  rt_mmcsd_unlock(void)
+{
+    if (sdio_mutex.parent.parent.name[0])
+        rt_mutex_release(&sdio_mutex);
+}
+
 rt_int32_t mmcsd_num_wr_blocks(struct rt_mmcsd_card *card)
 {
     rt_int32_t err;
