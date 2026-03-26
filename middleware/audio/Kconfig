@@ -84,10 +84,6 @@ config AUDIO_FREQSHIFT
         depends on AUDIO
     default n
  
-config PKG_USING_ANYKA
-    bool "Enable anyka anyblue1090 real-time speech enhancement processing"
-        depends on AUDIO
-    default n
 config PKG_USING_AUDIO_TEST_API
     bool "mic speaker test api"
         depends on AUDIO
