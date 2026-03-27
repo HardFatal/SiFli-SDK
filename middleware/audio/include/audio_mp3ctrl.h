@@ -62,6 +62,22 @@ mp3ctrl_handle mp3ctrl_open(audio_type_t type, const char *filename, audio_serve
 mp3ctrl_handle mp3ctrl_open2(audio_type_t type, const char *filename, audio_server_callback_func callback, void *callback_userdata, audio_device_e only_use_device);
 mp3ctrl_handle mp3ctrl_open_buffer(audio_type_t type, const char *buf, uint32_t buf_len, audio_server_callback_func callback, void *callback_userdata);
 mp3ctrl_handle mp3ctrl_open_buffer2(audio_type_t type, const char *buf, uint32_t buf_len, audio_server_callback_func callback, void *callback_userdata, audio_device_e only_use_device);
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+/**
+ * @brief Open an MP3 control handle backed by a ringbuffer.
+ *
+ * This interface is intended for streaming or incremental feed scenarios,
+ * where the audio data is supplied through the ringbuffer instead of a file.
+ *
+ * @param type Decoder type for the input stream.
+ * @param buf Ringbuffer used to provide stream data.
+ * @param file_len Expected total stream size in bytes.
+ * @param callback Audio server callback function.
+ * @param callback_userdata User context passed back to @p callback.
+ * @return MP3 control handle on success, or NULL on failure.
+ */
+mp3ctrl_handle mp3ctrl_open_ringbuffer(audio_type_t type, struct rt_ringbuffer *buf, uint32_t file_len, audio_server_callback_func callback, void *callback_userdata);
+#endif
 /**
     cmd:
       MP3CTRL_IOCTRL_LOOP_TIMES

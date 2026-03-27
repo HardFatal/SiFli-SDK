@@ -1870,6 +1870,18 @@ PUBLIC_API mp3ctrl_handle mp3ctrl_open_buffer(audio_type_t type,
     return mp3ctrl_open_real(type, buf, buf_len, callback, callback_userdata, AUDIO_DEVICE_AUTO);
 }
 
+#if AUDIO_MP3_RINGBUFF_SUPPORT
+mp3ctrl_handle mp3ctrl_open_ringbuffer(audio_type_t type,
+        struct rt_ringbuffer *buf,
+        uint32_t file_len,
+        audio_server_callback_func callback,
+        void *callback_userdata)
+{
+    /* use filename "rb" to mark use ringbuffer */
+    return mp3ctrl_open_real(type, "rb", file_len, callback, callback_userdata, AUDIO_DEVICE_AUTO);
+}
+#endif
+
 PUBLIC_API mp3ctrl_handle mp3ctrl_open_buffer2(audio_type_t type,
         const char *buf,
         uint32_t buf_len,
