@@ -422,7 +422,7 @@ static rt_err_t _wait_ready(struct rt_spi_device *device)
             return RT_EOK;
         }
 
-        if (rt_tick_timeout(tick_start, rt_tick_from_millisecond(1000)))
+        if (rt_tick_timeout(tick_start, rt_tick_from_millisecond(CARD_WAIT_TOKEN_TIMES)))
         {
             MSD_DEBUG("[err] wait ready timeout!\r\n");
             return RT_ETIMEOUT;
