@@ -307,6 +307,10 @@ config RT_USING_WDT
     depends on RT_USING_WDT
     int "Watch Dog timeout"
     default 30
+    config IWDT_SLEEP_TIMEOUT
+    depends on RT_USING_WDT
+    int "Watch Dog sleep timeout"
+    default 300	
 
 config RT_USING_AUDIO
     bool "Using Audio device drivers"
