@@ -346,8 +346,8 @@
 0x00064fc1 T rt_timer_start_rom
 0x000650c1 T rt_timer_stop
 0x00065139 T rt_vsnprintf
-0x000656dd T rt_wdt_init
-0x0006574d T rt_wdt_restore
+0x000656dd T rt_wdt_init_rom
+0x0006574d T rt_wdt_restore_rom
 0x0006ab39 T sys_init_lh_bt_audio_queue
 0x0006af0d T uart_isr
 0x0006be58 D HAL_HPAON_WakeupPinMapTbl
