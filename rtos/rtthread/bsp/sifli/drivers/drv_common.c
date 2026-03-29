@@ -623,16 +623,22 @@ RT_WEAK void rt_hw_board_init()
         extern void rt_hw_watchdog_init(void);
         rt_hw_watchdog_init();
 #if defined(SOLUTION_USING_DEVELOPER_MODE)
-        extern void service_set_watchdog_enable(uint8_t enable);
-        service_set_watchdog_enable(0);
+        extern void service_watchdog_enable_set(uint8_t enable);
+        service_watchdog_enable_set(0);
 #endif
     }
 #endif
 
     /* Heap initialization */
 #if defined(RT_USING_HEAP)
+#if defined(SOLUTION) && !defined (DFU_OTA_MANAGER)
+    extern int app_memheap_init(void);
+    app_memheap_init();
+#else
     rt_system_heap_init((void *)HEAP_BEGIN, (void *)HEAP_END);
 #endif
+#endif
+
 
     /* Pin driver initialization is open by default */
 #ifdef RT_USING_PIN
@@ -730,9 +736,26 @@ rt_tick_t rt_system_get_time(void)
 }
 #endif /* !SOC_BF_Z0 */
 
+void drv_reboot_preprocess(void)
+{
+#ifdef SOC_BF0_HCPU
+#if defined(SF32LB56X) || defined(SF32LB58X) || defined(SF32LB55X)
+    /* bluetooth is abnormal after the version rollback, see:ext-redmine#860 */
+    HAL_Set_backup(RTC_BACKUP_BT_LPCYCLE, 0);
+#if !defined(SOLUTION_RES_USING_NAND)
+    HAL_Set_backup(RTC_BACKUP_NAND_OTA_DES, 0);
+#endif /* !SOLUTION_RES_USING_NAND */
+#endif /* SF32LB56X || SF32LB58X || SF32LB55X */
+#endif /* SOC_BF0_HCPU */
+}
+
 void drv_reboot(void)
 {
     rt_hw_interrupt_disable();
+#ifdef SOLUTION
+    drv_reboot_preprocess();
+#endif /* SOLUTION */
+
     HAL_PMU_Reboot();
 }
 
@@ -1269,7 +1292,7 @@ void HAL_RCC_MspInit(void)
 #endif /* !BSP_USING_I2C6 */
 
 #if !defined(BSP_USING_GPTIM3) && !defined(BSP_USING_PWM4)
-    HAL_RCC_DisableModule(RCC_MOD_GPTIM3);
+    //HAL_RCC_DisableModule(RCC_MOD_GPTIM3);
 #endif /* !BSP_USING_GPTIM3 */
 #if !defined(BSP_USING_GPTIM4) && !defined(BSP_USING_PWM5)
     HAL_RCC_DisableModule(RCC_MOD_GPTIM4);
