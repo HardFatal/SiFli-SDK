@@ -154,7 +154,11 @@ MSH_CMD_EXPORT_ALIAS(app_mem_log, app_mem, app_mem: open or close app_mem log);
     /* Non-GUI_APP_FRAMEWORK projects don't need transition buffers. */
 #endif /* APP_TRANS_ANIMATION_SCALE_NEXT */
 
-
+#if PKG_USING_FFMPEG && (MEDIA_CACHE_SIZE > 0)
+    APP_L2_RET_BSS_SECT_BEGIN(app_ffmpeg_ret_cache)
+        APP_L2_RET_BSS_SECT(app_ffmpeg_ret_cache, ALIGN(4) static uint8_t app_ffmpeg_cache[MEDIA_CACHE_SIZE]);
+    APP_L2_RET_BSS_SECT_END
+#endif
 
 #if IMAGE_CACHE_IN_PSRAM_SIZE > 0
     struct rt_memheap app_image_psram_memheap;
@@ -174,6 +178,22 @@ MSH_CMD_EXPORT_ALIAS(app_mem_log, app_mem, app_mem: open or close app_mem log);
 
 #ifndef MESSAGE_BUFFER_IN_SRAM
     struct rt_memheap app_message_memheap;
+#endif
+
+#if PKG_USING_FFMPEG && (MEDIA_CACHE_SIZE > 0)
+static struct rt_memheap app_ffmpeg_memheap;
+static bool app_ffmpeg_memheap_ready = false;
+
+static void app_ffmpeg_memheap_init_once(void)
+{
+    if (app_ffmpeg_memheap_ready)
+    {
+        return;
+    }
+
+    rt_memheap_init(&app_ffmpeg_memheap, "ffmpeg_memheap", (void *)app_ffmpeg_cache, MEDIA_CACHE_SIZE);
+    app_ffmpeg_memheap_ready = true;
+}
 #endif
 
 /**********************
@@ -217,6 +237,10 @@ static int app_cahe_memheap_init(void)
 
 #ifdef QUICKJS_PSRAM_SIZE
     rt_memheap_init(&app_qjs_memheap, "app_qjs_memheap", (void *)app_qjs_cache, QUICKJS_PSRAM_SIZE);
+#endif
+
+#if PKG_USING_FFMPEG && (MEDIA_CACHE_SIZE > 0)
+    app_ffmpeg_memheap_init_once();
 #endif
 
     return 0;
@@ -705,15 +729,32 @@ typedef struct _ffmpeg_mem_header
     #define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
 
+void ffmpeg_heap_init(void)
+{
+#if MEDIA_CACHE_SIZE > 0
+    app_ffmpeg_memheap_init_once();
+#else
+    /* app_mem heaps are initialized during app_cahe_memheap_init(). */
+#endif
+}
+
 void *ffmpeg_alloc(size_t nbytes)
 {
     uint8_t *p;
     ffmpeg_mem_header *header_p;
 
+#if MEDIA_CACHE_SIZE > 0
+    app_ffmpeg_memheap_init_once();
+#endif
+
     if (nbytes > ALIGN64_SIZE_THRESHOLD)
     {
         size_t header_size = 63 + FFMPEG_MEM_HEADER;
+#if MEDIA_CACHE_SIZE > 0
+        p = (uint8_t *)rt_memheap_alloc(&app_ffmpeg_memheap, nbytes + header_size);
+#else
         p = app_anim_mem_alloc(nbytes + header_size, 1);
+#endif
         if (!p) return NULL;
 
         header_p = (ffmpeg_mem_header *)(RT_ALIGN_DOWN((uint32_t)(p + header_size), 64) - FFMPEG_MEM_HEADER);
@@ -722,7 +763,11 @@ void *ffmpeg_alloc(size_t nbytes)
     }
     else
     {
+#if MEDIA_CACHE_SIZE > 0
+        p = (uint8_t *)rt_memheap_alloc(&app_ffmpeg_memheap, nbytes + FFMPEG_MEM_HEADER);
+#else
         p = app_anim_mem_alloc(nbytes + FFMPEG_MEM_HEADER, 1);
+#endif
         if (!p) return NULL;
 
         header_p = (ffmpeg_mem_header *) p;
@@ -743,7 +788,11 @@ void ffmpeg_free(void *p)
     ffmpeg_mem_header *header_p = ((ffmpeg_mem_header *)p) - 1;
 
     RT_ASSERT(FFMPEG_MEM_MAGIC == header_p->magic);
+#if MEDIA_CACHE_SIZE > 0
+    rt_memheap_free(((uint8_t *)p) - header_p->offset);
+#else
     app_anim_mem_free(((uint8_t *)p) - header_p->offset);
+#endif
 }
 
 void *ffmpeg_realloc(void *p, size_t new_size)
@@ -765,6 +814,26 @@ void *ffmpeg_realloc(void *p, size_t new_size)
     }
 
     return new_p;
+}
+
+void *audio_mem_malloc(uint32_t size)
+{
+    void *ptr = ffmpeg_alloc(size);
+    RT_ASSERT(ptr);
+    return ptr;
+}
+
+void audio_mem_free(void *ptr)
+{
+    ffmpeg_free(ptr);
+}
+
+void *audio_mem_calloc(uint32_t count, uint32_t size)
+{
+    void *ptr = ffmpeg_alloc(count * size);
+    RT_ASSERT(ptr);
+    memset(ptr, 0, count * size);
+    return ptr;
 }
 #endif
 

@@ -22,6 +22,9 @@ extern "C" {
 #include <stdbool.h>
 #include <rtthread.h>
 #include "lvgl.h"
+#ifdef DISABLE_LVGL_V8
+#include "src/misc/cache/instance/lv_image_cache.h"
+#endif
 //#include "lv_img_buf.h"
 #include "mem_section.h"
 
@@ -208,6 +211,55 @@ void app_mem_invalid_icache(void *data, uint32_t size);
 */
 uint8_t app_get_mem_type(void *data);
 
+#if PKG_USING_FFMPEG
+/**
+@brief initialize ffmpeg memory heap
+*/
+void ffmpeg_heap_init(void);
+
+/**
+@brief allocate memory from ffmpeg heap with alignment support for EPIC (>64K)
+@param nbytes size in bytes to allocate
+@retval pointer to allocated memory, NULL on failure
+*/
+void *ffmpeg_alloc(size_t nbytes);
+
+/**
+@brief free memory allocated by ffmpeg_alloc
+@param p pointer previously returned by ffmpeg_alloc
+*/
+void ffmpeg_free(void *p);
+
+/**
+@brief reallocate memory from ffmpeg heap
+@param p pointer previously returned by ffmpeg_alloc, NULL for new allocation
+@param new_size new size in bytes
+@retval pointer to reallocated memory, NULL on failure
+*/
+void *ffmpeg_realloc(void *p, size_t new_size);
+
+/**
+@brief allocate audio memory from ffmpeg heap
+@param size size in bytes to allocate
+@retval pointer to allocated memory
+*/
+void *audio_mem_malloc(uint32_t size);
+
+/**
+@brief free audio memory allocated by audio_mem_malloc
+@param ptr pointer to free
+*/
+void audio_mem_free(void *ptr);
+
+/**
+@brief allocate zeroed audio memory from ffmpeg heap
+@param count number of elements
+@param size size of each element in bytes
+@retval pointer to zeroed allocated memory
+*/
+void *audio_mem_calloc(uint32_t count, uint32_t size);
+#endif
+
 
 /**********************
  *      MACROS
@@ -342,6 +394,10 @@ uint8_t app_get_mem_type(void *data);
 
 #ifndef FREETYPE_ACT_CACHE_SIZE
 #define FREETYPE_ACT_CACHE_SIZE (FT_CACHE_SIZE) // * 75 / 100)
+#endif
+
+#ifndef MEDIA_CACHE_SIZE
+#define MEDIA_CACHE_SIZE 0
 #endif
 
 #if defined(USING_EZIPA_DEC) && defined(EZIPA_CUSTOM_INCLUDE_FILE)
