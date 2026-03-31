@@ -22,7 +22,7 @@
     #define VBE_OUT_BUFFER_SIZE     (sizeof(short) * MAX_NCHAN * MAX_NGRAN * MAX_NSAMP + VBE_ONE_FRAME_SAMPLES * MAX_NCHAN * sizeof(short))
 #endif
 #if AUDIO_MP3_RINGBUFF_SUPPORT
-#include "mp3_ringbuffer.h"
+    #include "mp3_ringbuffer.h"
 #endif
 
 #define PUBLIC_API
@@ -226,7 +226,7 @@ static int buf_read(mp3ctrl_handle handle, void *buf, int len)
         }
         else
 #endif
-        memcpy(buf, handle->filename + handle->fd, len);
+            memcpy(buf, handle->filename + handle->fd, len);
     }
     handle->fd = handle->fd + (int)len;
 #if AUDIO_MP3_RINGBUFF_SUPPORT
@@ -1184,7 +1184,7 @@ static void mp3ctrl_thread_entry_file(void *parameter)
             {
                 LOG_D("mp3 cache full");
                 cache_full_occured = 1;
-                rt_thread_mdelay(20);
+                rt_thread_mdelay(1);
             }
             else
             {
@@ -1591,7 +1591,7 @@ check_write_result:
         {
             LOG_D("wav cache full");
             cache_full_occured = 1;
-            rt_thread_mdelay(10);
+            rt_thread_mdelay(1);
         }
         else
         {
@@ -1718,14 +1718,14 @@ static mp3ctrl_handle mp3ctrl_open_real(audio_type_t type,
     }
     else
 #endif
-    if (len == -1)
-    {
-        LOG_I("mp3 open %s callback=0x%x", filename, (uint32_t)callback);
-    }
-    else
-    {
-        LOG_I("mp3 buf 0x%p callback=0x%x", filename, (uint32_t)callback);
-    }
+        if (len == -1)
+        {
+            LOG_I("mp3 open %s callback=0x%x", filename, (uint32_t)callback);
+        }
+        else
+        {
+            LOG_I("mp3 buf 0x%p callback=0x%x", filename, (uint32_t)callback);
+        }
     mp3ctrl_handle handle = audio_mem_calloc(1, sizeof(struct mp3ctrl_t));
     RT_ASSERT(handle);
     handle->use_device = want_use_device;
