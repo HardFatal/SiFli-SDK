@@ -44,6 +44,20 @@ default_boards: &default_boards
   - sf32lb58-lcd_n16r32n1_qspi
   - sf32lb58-lcd_n16r64n4
 
+default_nand_boards: &default_nand_boards
+  - ec-lb567_hcpu
+  - eh-lb563_hcpu
+  - eh-lb525_hcpu
+  - ec-lb587_hcpu
+  - ec-lb587_a2_hcpu
+  - ec-lb585_hcpu
+  - ec-lb583_hcpu
+  - sf32lb52-lcd_a128r16
+  - sf32lb52-nano_a128r16
+  - sf32lb56-lcd_a128r12n1
+  - sf32lb58-lcd_a128r32n1_qspi
+
+
 bt_boards: &bt_boards
   - ec-lb567_hcpu
   - eh-lb563_hcpu
@@ -546,7 +560,7 @@ common_projects:
     boards: *default_boards
 
   - path: example/storage/fatfs/nand/project
-    boards: *default_boards
+    boards: *default_nand_boards
 
   - path: example/storage/fatfs/nor/project
     boards: *default_boards
