@@ -38,6 +38,17 @@
 #define EVT_INIT_OK         (1<<0)
 #define EVT_INIT_FAILED     (1<<1)
 
+static uint16_t g_media_instance_seq;
+
+/*
+ * Keep thread names within RT_NAME_MAX by using a one-character role prefix
+ * plus a fixed six-character base62 encoding of the monotonically increasing
+ * player instance id, which avoids truncation and low-bit address collisions.
+ */
+static inline void media_format_thread_name(char *name, rt_size_t size, char prefix, ffmpeg_handle thiz)
+{
+    rt_snprintf(name, size, "%c_%04x", prefix, thiz->instance_id);
+}
 
 static ffmpeg_handle g_player = NULL;
 
@@ -1248,7 +1259,7 @@ static int mediaplayer_start(ffmpeg_handle thiz, bool is_file)
     if (thiz->is_network_file)
     {
         // Initialize AV packet queue
-        snprintf(thiz->video_name, sizeof(thiz->video_name), "%p_video", thiz);
+        media_format_thread_name(thiz->video_name, sizeof(thiz->video_name), 'v', thiz);
         thiz->av_pkt_queue = os_message_queue_create_int("avpkt", NETWORK_BUFFER_CAPACITY, sizeof(AVPacket), NULL, 0);
         RT_ASSERT(thiz->av_pkt_queue != NULL);
 
@@ -1280,7 +1291,7 @@ static int mediaplayer_start(ffmpeg_handle thiz, bool is_file)
 
         if (thiz->cfg.audio_enable)
         {
-            snprintf(thiz->audio_name, sizeof(thiz->audio_name), "%p_audio", thiz);
+            media_format_thread_name(thiz->audio_name, sizeof(thiz->audio_name), 'a', thiz);
 #if SINGLE_FFMPEG_INSTACE
             thiz->audio_decode_thread = os_thread_create(thiz->audio_name, audio_decode_thread, thiz,
                                         ffmpeg_audio_dec_thread_stack, ffmpeg_audio_dec_thread_stack_size,
@@ -1299,7 +1310,7 @@ static int mediaplayer_start(ffmpeg_handle thiz, bool is_file)
 
         if (thiz->cfg.video_enable)
         {
-            snprintf(thiz->video_name, sizeof(thiz->video_name), "%p_video", thiz);
+            media_format_thread_name(thiz->video_name, sizeof(thiz->video_name), 'v', thiz);
 #if SINGLE_FFMPEG_INSTACE
             thiz->video_decode_thread = os_thread_create(thiz->video_name, video_decode_thread, thiz,
                                         ffmpeg_video_dec_thread_stack, ffmpeg_video_dec_thread_stack_size,
@@ -1881,7 +1892,7 @@ static bool demux_sifli_ezip_media(ffmpeg_handle thiz)
 
     if (thiz->cfg.audio_enable)
     {
-        snprintf(thiz->ezip_aud_name, sizeof(thiz->ezip_aud_name), "%p_ezipaud", thiz);
+        media_format_thread_name(thiz->ezip_aud_name, sizeof(thiz->ezip_aud_name), 'e', thiz);
 #if SINGLE_FFMPEG_INSTACE
         thiz->audio_decode_thread = os_thread_create(thiz->ezip_aud_name, ezip_audio_decode_thread, thiz,
                                     ffmpeg_audio_dec_thread_stack, ffmpeg_audio_dec_thread_stack_size,
@@ -1898,7 +1909,7 @@ static bool demux_sifli_ezip_media(ffmpeg_handle thiz)
 #endif
     }
 
-    snprintf(thiz->read_name, sizeof(thiz->read_name), "%p_ezipread", thiz);
+    media_format_thread_name(thiz->read_name, sizeof(thiz->read_name), 'z', thiz);
     thiz->av_pkt_read_thread = rt_thread_create(thiz->read_name, ezip_read_thread, thiz,
                                stack_size,
                                priority,
@@ -1975,6 +1986,12 @@ int ffmpeg_open(ffmpeg_handle *return_hanlde, ffmpeg_config_t *cfg, uint32_t use
     thiz->is_wait_for_resume = cfg->is_wait_for_resume;
     LOG_I("%s thiz=%p", __FUNCTION__, thiz);
     thiz->magic = FFMPEG_HANDLE_MAGIC;
+
+    /* Protect the monotonic instance id allocation from duplicate assignment. */
+    rt_base_t instance_level = rt_hw_interrupt_disable();
+    thiz->instance_id = g_media_instance_seq++;
+    rt_hw_interrupt_enable(instance_level);
+
     thiz->user_data = user_data;
     thiz->last_seconds = -1;
     memcpy(&thiz->cfg, cfg, sizeof(ffmpeg_config_t));
@@ -2015,7 +2032,7 @@ int ffmpeg_open(ffmpeg_handle *return_hanlde, ffmpeg_config_t *cfg, uint32_t use
         return 0;
     }
 
-    snprintf(thiz->read_name, sizeof(thiz->read_name), "%p_read", thiz);
+    media_format_thread_name(thiz->read_name, sizeof(thiz->read_name), 'r', thiz);
 
     os_event_create(thiz->evt_init);
     RT_ASSERT(thiz->evt_init);
@@ -2503,4 +2520,3 @@ static void ff_seek(uint8_t argc, char **argv)
 
 MSH_CMD_EXPORT(ff_seek, ff_seek commnad);
 #endif
-

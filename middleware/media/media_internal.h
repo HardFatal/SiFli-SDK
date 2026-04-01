@@ -209,6 +209,7 @@ typedef struct ffmpeg_decoder_tag
     ezip_media_t            ezip_header;
     sifli_resample_t       *resample;
     uint8_t                *audio_stereo;
+    uint16_t                instance_id;   /* unique player instance sequence */
     uint8_t                 is_sifli_ezip_memdia;
     uint8_t                 is_nand;
     uint8_t                 is_ram;
