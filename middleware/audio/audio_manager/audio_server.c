@@ -486,6 +486,13 @@ static void audio_device_change(audio_server_t *server);
 static int audio_write_resample(audio_client_t c, uint8_t *data, uint32_t data_size);
 static inline void send_cmd_event_to_server();
 
+static pcm_data_fun_cb pcm_data_fun =  NULL;
+void audio_set_pcm_callback(pcm_data_fun_cb fun)
+{
+    pcm_data_fun = fun;
+}
+
+
 RT_WEAK rt_err_t pm_scenario_start(pm_scenario_name_t scenario)
 {
     return 0;
@@ -4071,6 +4078,11 @@ AUDIO_API int audio_write(audio_client_t handle, uint8_t *data, uint32_t data_le
     {
         LOG_D("audio_write is suspend %d", handle->audio_type);
         return -1;
+    }
+
+    if (pcm_data_fun)
+    {
+        pcm_data_fun((const int16_t *) data, data_len / 2, &handle->parameter);
     }
 
 #if SOFTWARE_TX_MIX_ENABLE

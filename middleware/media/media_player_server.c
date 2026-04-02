@@ -42,8 +42,6 @@ static uint16_t g_media_instance_seq;
 
 /*
  * Keep thread names within RT_NAME_MAX by using a one-character role prefix
- * plus a fixed six-character base62 encoding of the monotonically increasing
- * player instance id, which avoids truncation and low-bit address collisions.
  */
 static inline void media_format_thread_name(char *name, rt_size_t size, char prefix, ffmpeg_handle thiz)
 {
