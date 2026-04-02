@@ -58,9 +58,6 @@
 #include "bf0_hal_audprc.h"
 #include "drv_audprc.h"
 
-#ifdef BSP_ENABLE_I2S_CODEC
-    #include "drv_i2s_audio.h"
-#endif
 #if defined(AUDIO_RX_USING_I2S) || defined(AUDIO_TX_USING_I2S)
     #if !BSP_ENABLE_I2S_CODEC
         #error "should enable BSP_ENABLE_I2S_CODEC"
@@ -289,8 +286,11 @@ typedef struct
     rt_device_t                 audcodec_dev;
     rt_device_t                 pdm;
     rt_device_t                 i2s;
+    struct rt_ringbuffer        *mic0_rb;
+    struct rt_ringbuffer        *mic1_rb;
     uint8_t                     *tx_data_tmp;
     uint8_t                     *rx_data_tmp;
+    uint8_t                     *rx_data_tmp2;
     uint32_t                    tx_samplerate;
     uint32_t                    rx_samplerate;
     int                         last_volume;
@@ -315,6 +315,9 @@ typedef struct
     uint8_t                     is_eq_mute_volume;
     uint8_t                     tx_empty_cnt;
     uint8_t                     is_wait_rx_start;
+    mics_t                      mic_used;
+    uint8_t                     mic0_got;
+    uint8_t                     mic1_got;
 
 #if DEBUG_FRAME_SYNC
     uint32_t                    debug_tx_index;
@@ -475,6 +478,7 @@ static const audio_mix_policy_t mix_policy[AUDIO_TYPE_NUMBER] =
 /*------------------local function------*/
 static rt_err_t speaker_tx_done(rt_device_t dev, void *buffer);
 static rt_err_t mic_rx_ind(rt_device_t dev, rt_size_t size);
+static void dual_adc_rx_ind(uint8_t channel_id, uint8_t *data, rt_size_t len);
 static void start_rx(audio_device_speaker_t *my);
 static audio_client_t device_get_tx_in_running(audio_device_ctrl_t *device, int index);
 static audio_client_t device_get_rx_in_running(audio_device_ctrl_t *device);
@@ -889,7 +893,15 @@ static inline void process_speaker_rx(audio_server_t *server, audio_device_speak
     }
     len = rt_device_read(my->pdm, 0, my->rx_data_tmp, readlen);
 #else
-    len = rt_device_read(my->audprc_dev, 0, my->rx_data_tmp, readlen);
+    if (my->mic_used == AUDIO_MIC_ALL)
+    {
+        len = rt_ringbuffer_get(my->mic0_rb, my->rx_data_tmp, CODEC_DATA_UNIT_LEN);
+        len = rt_ringbuffer_get(my->mic1_rb, my->rx_data_tmp2, CODEC_DATA_UNIT_LEN);
+    }
+    else
+    {
+        len = rt_device_read(my->audprc_dev, 0, my->rx_data_tmp, readlen);
+    }
 #endif
     if (len != readlen)
     {
@@ -911,6 +923,7 @@ static inline void process_speaker_rx(audio_server_t *server, audio_device_speak
     }
     else
     {
+        audio_dump_data(ADUMP_PDM_RX, my->rx_data_tmp2, len);
         audio_dump_data(ADUMP_AUDPRC, my->rx_data_tmp, len);
     }
 
@@ -923,17 +936,26 @@ static inline void process_speaker_rx(audio_server_t *server, audio_device_speak
 
     if (!server->is_bt_3a)
     {
-        audio_server_coming_data_t data;
+        audio_server_coming_data_t data, data2;
         data.data = my->rx_data_tmp;
         data.data_len = len;
         data.reserved = 0;
+        data2.data = my->rx_data_tmp2;
+        data2.data_len = len;
+        data2.reserved = 1;
+
         if (server->public_is_rx_mute)
         {
             memset(my->rx_data_tmp, 0, len);
+            memset(my->rx_data_tmp2, 0, len);
         }
         if (client->callback)
         {
             client->callback(as_callback_cmd_data_coming, client->user_data, (uint32_t)&data);
+            if (my->mic_used == AUDIO_MIC_ALL)
+            {
+                client->callback(as_callback_cmd_data_coming, client->user_data, (uint32_t)&data2);
+            }
         }
     }
 Exit:
@@ -1133,16 +1155,43 @@ static void config_tx(audio_device_speaker_t *my, audio_client_t client)
     }
     rt_device_control(my->audprc_dev, AUDIO_CTL_SET_TX_DMA_SIZE, (void *)my->tx_dma_size);
 
-#define     mixer_sel  0x5050
     struct rt_audio_caps caps;
     struct rt_audio_sr_convert cfg;
     int stream;
-    /* mix left & right channel to mono channel output, too big volume sometime */
-    int     out_sel = 0x5050;
-    if (my->tx_channels == 2 && g_hardware_mix_enable)
+
+    /*
+        setting format, 16bits, DAC intput and output can select two source to mix
+        for stereo PCM data, data layout as LRLRLRLR....   L or R is 16bits little-end data
+
+        bits 15~12 -- Codec Left Channel source 0 selector. 0 means L data, 1 mean R data, 5 means this source is mute
+        bits 11~8 --  Codec Left Channel source 1 selector. 0 means L data, 1 mean R data, 5 means this source is mute
+        bits 7~4 --   Codec Right Channel source 0 selector. 0 means L data, 1 mean R data, 5 means this source is mute
+        bits 3~0 --   Codec Right Channel source 1 selector. 0 means L data, 1 mean R data, 5 means this source is mute
+
+        PCM flow:  pcm source --> Codec internal Channel --> DAC output
+
+        A. hardware step 1: codec source to Codec internal Channel, codec source maybe PCM L/R data or Mute
+
+        codec source 0 ----\
+                            ---->  Codec internal Channel
+        codec source 1 ----/
+
+        B. hardware step 2: DAC source to DAC output, DAC source maybe Codec internal channel L/R, Mute or ADC rx
+
+        DAC source 0 ----\
+                          ---->  DAC output
+        DAC source 1 ----/
+    */
+    int  mixer_sel = 0x5050; /* Codec internal L Channel is mixed by mute & L data; Codec internal R Channel is mixed by mute & L data */
+    int  out_sel = 0x5050; /* DAC1 output is mixed by mute & L Channel; DAC2 output is mixed by mute & L Channel */
+
+#if BSP_ENABLE_DAC2
+    if (my->tx_channels == 2)
     {
-        out_sel = 0x5010; //mix left & right to speaker.  speaker pcm = left pcm + right pcm
+        mixer_sel = 0x5051; /* Codec internal L Channel is mixed by mute & L data; Codec internal R Channel is mixed by mute & R data" */
+        out_sel = 0x5051; /* DAC1 output is mixed by mute & L Channel; DAC2 output is mixed by mute & R Channel */
     }
+#endif
 
     /*set output: codec/mem/i2s*/
     rt_device_control(my->audcodec_dev, AUDIO_CTL_SETOUTPUT, (void *)AUDPRC_TX_TO_CODEC);
@@ -1267,8 +1316,20 @@ static void config_rx(audio_device_speaker_t *my, audio_client_t client)
     }
     my->need_i2s_rx = 1;
 #else
-    LOG_I("config rx--set callback");
-    if (client->audio_type != AUDIO_TYPE_MODEM_VOICE)
+    my->mic_used = client->parameter.read_which_mic;
+    LOG_I("config rx--set callback mic=%d", my->mic_used);
+    if (my->mic_used == AUDIO_MIC_ALL)
+    {
+        my->mic0_got = 0;
+        my->mic1_got = 0;
+        my->mic0_rb = rt_ringbuffer_create(CODEC_DATA_UNIT_LEN * 2);
+        my->mic1_rb = rt_ringbuffer_create(CODEC_DATA_UNIT_LEN * 2);
+        RT_ASSERT(my->mic0_rb);
+        RT_ASSERT(my->mic1_rb);
+        rt_device_set_rx_indicate(my->audprc_dev, NULL);
+        rt_device_set_dual_rx_indicate(dual_adc_rx_ind);
+    }
+    else if (client->audio_type != AUDIO_TYPE_MODEM_VOICE)
     {
         rt_device_set_audprc_dma_rx_callback(NULL);
         rt_device_set_rx_indicate(my->audprc_dev, mic_rx_ind);
@@ -1278,7 +1339,18 @@ static void config_rx(audio_device_speaker_t *my, audio_client_t client)
     int stream;
     rt_device_control(my->audcodec_dev, AUDIO_CTL_SETINPUT, (void *)AUDPRC_RX_FROM_CODEC);
     caps.main_type = AUDIO_TYPE_INPUT;
-    caps.sub_type = 1 << HAL_AUDCODEC_ADC_CH0;
+    if (my->mic_used == AUDIO_MIC0_ONLY)
+    {
+        caps.sub_type = (1 << HAL_AUDCODEC_ADC_CH0);
+    }
+    else if (my->mic_used == AUDIO_MIC1_ONLY)
+    {
+        caps.sub_type = (1 << HAL_AUDCODEC_ADC_CH1);
+    }
+    else
+    {
+        caps.sub_type |= ((1 << HAL_AUDCODEC_ADC_CH0) | (1 << HAL_AUDCODEC_ADC_CH1));
+    }
     caps.udata.config.channels   = my->rx_channels;
     caps.udata.config.samplerate = my->rx_samplerate;
     caps.udata.config.samplefmt = 16; //8 16 24 or 32
@@ -1290,14 +1362,32 @@ static void config_rx(audio_device_speaker_t *my, audio_client_t client)
     rt_device_control(my->audprc_dev, AUDIO_CTL_SETINPUT, (void *)AUDPRC_RX_FROM_CODEC);
 
     caps.main_type = AUDIO_TYPE_INPUT;
-    caps.sub_type = HAL_AUDPRC_RX_CH0 - HAL_AUDPRC_RX_CH0;
+    caps.sub_type = HAL_AUDPRC_RX_CH0 - HAL_AUDPRC_RX_CH0; // default 0
+    if (my->mic_used == AUDIO_MIC1_ONLY)
+    {
+        caps.sub_type = HAL_AUDPRC_RX_CH1 - HAL_AUDPRC_RX_CH0;
+    }
     caps.udata.config.channels   = my->rx_channels;
     caps.udata.config.samplerate = my->rx_samplerate;
     caps.udata.config.samplefmt = 16;
-    LOG_I("mic input:rx channel %d, channels %d, rate %d, bitwidth %d", 0, caps.udata.config.channels,
+    LOG_I("mic0: channels %d, type=%d rate %d, bitwidth %d", caps.udata.config.channels, caps.sub_type,
           caps.udata.config.samplerate, caps.udata.config.samplefmt);
     rt_device_control(my->audprc_dev, AUDIO_CTL_CONFIGURE, &caps);
+
+    if (my->mic_used == AUDIO_MIC_ALL)
+    {
+        caps.main_type = AUDIO_TYPE_INPUT;
+        caps.sub_type = HAL_AUDPRC_RX_CH1 - HAL_AUDPRC_RX_CH0; /* ch1 for ADC2 */
+        caps.udata.config.channels   = my->rx_channels;
+        caps.udata.config.samplerate = my->rx_samplerate;
+        caps.udata.config.samplefmt = 16;
+        LOG_I("mic1: channels %d, type=%d rate %d, bitwidth %d", 0, caps.udata.config.channels, caps.sub_type,
+              caps.udata.config.samplerate, caps.udata.config.samplefmt);
+        rt_device_control(my->audprc_dev, AUDIO_CTL_CONFIGURE, &caps);
+    }
+
     my->need_adc_rx = 1;
+
 #endif
 }
 
@@ -1308,9 +1398,25 @@ static void start_rx(audio_device_speaker_t *my)
     if (my->need_adc_rx)
     {
         my->need_adc_rx = 0;
-        stream = AUDIO_STREAM_RECORD | ((1 << HAL_AUDCODEC_ADC_CH0) << 8);
+        stream = AUDIO_STREAM_RECORD | ((1 << HAL_AUDCODEC_ADC_CH0) << 8); // ADC1
+        if (my->mic_used == AUDIO_MIC1_ONLY)
+        {
+            stream = AUDIO_STREAM_RECORD | ((1 << HAL_AUDCODEC_ADC_CH1) << 8); // ADC2
+        }
+        if (my->mic_used == AUDIO_MIC_ALL)
+        {
+            stream |= ((1 << HAL_AUDCODEC_ADC_CH1) << 8); // ADC2
+        }
         rt_device_control(my->audcodec_dev, AUDIO_CTL_START, &stream);
         stream = AUDIO_STREAM_RECORD | ((1 << HAL_AUDPRC_RX_CH0) << 8);
+        if (my->mic_used == AUDIO_MIC1_ONLY)
+        {
+            stream = AUDIO_STREAM_RECORD | ((1 << HAL_AUDPRC_RX_CH1) << 8);
+        }
+        if (my->mic_used == AUDIO_MIC_ALL)
+        {
+            stream |= ((1 << HAL_AUDPRC_RX_CH1) << 8); // Rx ch1 for ADC2
+        }
         rt_device_control(my->audprc_dev, AUDIO_CTL_START, &stream);
     }
 
@@ -1637,6 +1743,8 @@ static int audio_device_speaker_open(void *user_data, audio_device_input_callbac
         RT_ASSERT(!my->rx_data_tmp);
         my->rx_data_tmp = audio_mem_malloc(CODEC_DATA_UNIT_LEN * 2); //may stereo pmd
         RT_ASSERT(my->rx_data_tmp);
+        my->rx_data_tmp2 = audio_mem_malloc(CODEC_DATA_UNIT_LEN); //ADC2
+        RT_ASSERT(my->rx_data_tmp2);
 
     }
 
@@ -1813,6 +1921,17 @@ static int audio_device_speaker_close(void *user_data)
         audio_hardware_pa_stop();
         stream_audcodec = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDCODEC_ADC_CH0) << 8) | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
         stream_audprc   = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDPRC_RX_CH0) << 8) | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+        if (my->mic_used == AUDIO_MIC1_ONLY)
+        {
+            stream_audcodec = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDCODEC_ADC_CH1) << 8) | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
+            stream_audprc   = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDPRC_RX_CH1) << 8) | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+        }
+        if (my->mic_used == AUDIO_MIC_ALL)
+        {
+            stream_audcodec |= ((1 << HAL_AUDCODEC_ADC_CH1) << 8); // ADC2
+            stream_audprc |= ((1 << HAL_AUDPRC_RX_CH1) << 8); // Rx ch1 for ADC2
+        }
+
         rt_base_t txrx = rt_hw_interrupt_disable();
         my->opened_map_flag  &= ~OPEN_MAP_TXRX;
         rt_hw_interrupt_enable(txrx);
@@ -1839,6 +1958,16 @@ static int audio_device_speaker_close(void *user_data)
         LOG_I("close rx");
         stream_audcodec = AUDIO_STREAM_RECORD | ((1 << HAL_AUDCODEC_ADC_CH0) << 8);
         stream_audprc = AUDIO_STREAM_RECORD | ((1 << HAL_AUDPRC_RX_CH0) << 8);
+        if (my->mic_used == AUDIO_MIC1_ONLY)
+        {
+            stream_audcodec = AUDIO_STREAM_RECORD | ((1 << HAL_AUDCODEC_ADC_CH1) << 8);
+            stream_audprc = AUDIO_STREAM_RECORD | ((1 << HAL_AUDPRC_RX_CH1) << 8);
+        }
+        if (my->mic_used == AUDIO_MIC_ALL)
+        {
+            stream_audcodec |= ((1 << HAL_AUDCODEC_ADC_CH1) << 8); // ADC2
+            stream_audprc |= ((1 << HAL_AUDPRC_RX_CH1) << 8); // Rx ch1 for ADC2
+        }
         rt_base_t rx = rt_hw_interrupt_disable();
         my->opened_map_flag  &= ~OPEN_MAP_RX;
         rt_hw_interrupt_enable(rx);
@@ -1851,7 +1980,7 @@ static int audio_device_speaker_close(void *user_data)
 
     if (need_tx_deinit || need_rx_deinit)
     {
-
+#ifdef BSP_ENABLE_I2S_CODEC
         if (my->i2s)
         {
             int stream = AUDIO_STREAM_REPLAY;
@@ -1862,7 +1991,14 @@ static int audio_device_speaker_close(void *user_data)
             rt_device_close(my->i2s);
             my->i2s = NULL;
         }
-
+#endif
+        /* dual ADCs callback has higher priority than callcack set by rt_device_set_rx_indicate(single_mic_callback) ,
+           so disable dual ADCs callback when close ADC
+        */
+        if (need_rx_deinit)
+        {
+            rt_device_set_dual_rx_indicate(NULL);
+        }
         if (my->audcodec_dev)
             rt_device_control(my->audcodec_dev, AUDIO_CTL_STOP, &stream_audcodec);
         if (my->audprc_dev)
@@ -1885,6 +2021,16 @@ static int audio_device_speaker_close(void *user_data)
         {
             //stream_audcodec = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDCODEC_ADC_CH0) << 8) | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
             //stream_audprc = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDPRC_RX_CH0) << 8) | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+            //if (my->mic_used == AUDIO_MIC0_ONLY)
+            //{
+            //    stream_audcodec = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDCODEC_ADC_CH`) << 8) | ((1 << HAL_AUDCODEC_DAC_CH0) << 8);
+            //    stream_audprc = AUDIO_STREAM_RXandTX | ((1 << HAL_AUDPRC_RX_CH`) << 8) | ((1 << HAL_AUDPRC_TX_CH0) << 8);
+            //}
+            //if (my->mic_used == AUDIO_MIC_ALL)
+            //{
+            //    stream_audcodec |= ((1 << HAL_AUDCODEC_ADC_CH1) << 8); // ADC2
+            //    stream_audprc |= ((1 << HAL_AUDPRC_RX_CH1) << 8); // Rx ch1 for ADC2
+            //}
             //rt_device_control(my->audcodec_dev, AUDIO_CTL_STOP, &stream_audcodec);
             //rt_device_control(my->audprc_dev, AUDIO_CTL_STOP, &stream_audprc);
 
@@ -1913,6 +2059,15 @@ static int audio_device_speaker_close(void *user_data)
         RT_ASSERT((my->opened_map_flag  & OPEN_MAP_RX) == 0);
         audio_mem_free(my->rx_data_tmp);
         my->rx_data_tmp = NULL;
+        audio_mem_free(my->rx_data_tmp2);
+        my->rx_data_tmp2 = NULL;
+        if (my->mic0_rb)
+            rt_ringbuffer_destroy(my->mic0_rb);
+        if (my->mic1_rb)
+            rt_ringbuffer_destroy(my->mic1_rb);
+        my->mic0_rb = NULL;
+        my->mic1_rb = NULL;
+        my->mic_used = AUDIO_MIC0_ONLY;
     }
 
     if (my->tx_data_tmp && !my->tx_ref)
@@ -2974,6 +3129,33 @@ static rt_err_t mic_rx_ind(rt_device_t dev, rt_size_t size)
     return RT_EOK;
 }
 
+static void dual_adc_rx_ind(uint8_t adc_id, uint8_t *data, rt_size_t len)
+{
+    audio_device_speaker_t *my;
+    audio_server_t *server = get_server();
+    my = &server->device_speaker_private;
+
+    //rt_kprintf("%s adc=%d len=%d\n", __func__, adc_id, len);
+
+    if (adc_id == 0 && my->mic0_rb)
+    {
+        rt_ringbuffer_put(my->mic0_rb, data, len);
+        my->mic0_got = 1;
+    }
+    else if (adc_id == 1 && my->mic1_rb)
+    {
+        rt_ringbuffer_put(my->mic1_rb, data, len);
+        my->mic1_got = 1;
+    }
+    if (my->mic0_got && my->mic1_got)
+    {
+        my->mic0_got = 0;
+        my->mic1_got = 0;
+        rt_event_send(&server->event, AUDIO_SERVER_EVENT_RX);
+    }
+}
+
+
 void auido_gain_pcm(int16_t *p, rt_size_t len, uint8_t shift)
 {
     int pcm;
@@ -3654,6 +3836,15 @@ static audio_client_t audio_client_init(audio_type_t audio_type, audio_rwflag_t 
     uint32_t tx_ring_size;
     RT_ASSERT(parameter);
     LOG_I("audio_open type=%d d=%d rw=%d tx cache=%d rx cache=%d", audio_type, device, rwflag, parameter->write_cache_size, parameter->read_cache_size);
+
+#ifndef BSP_AUDPRC_RX1_DMA
+    if (parameter->read_which_mic != AUDIO_MIC0_ONLY)
+    {
+        rt_kprintf("should enable CONFIG_BSP_AUDPRC_RX1_DMA=y\n");
+        RT_ASSERT(0);
+        parameter->read_which_mic = AUDIO_MIC0_ONLY;
+    }
+#endif
 
     RT_ASSERT(audio_type < AUDIO_TYPE_NUMBER);
     audio_client_t handle = audio_mem_calloc(1, sizeof(struct audio_client_base_t));

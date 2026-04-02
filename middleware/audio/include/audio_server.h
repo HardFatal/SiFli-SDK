@@ -75,6 +75,13 @@ typedef enum
 
 typedef enum
 {
+    AUDIO_MIC0_ONLY = 0, // only use mic 0, default value, Forward compatible
+    AUDIO_MIC1_ONLY = 1, // only use mic 1
+    AUDIO_MIC_ALL   = 2, // use mic 0 and mic 1, callback data is LRLRLRLR....
+} mics_t;
+
+typedef enum
+{
     as_callback_cmd_opened           = 0,
     as_callback_cmd_closed           = 1,
     as_callback_cmd_muted            = 2,
@@ -115,6 +122,7 @@ typedef struct
     // read paramter, only invalid when rwflag is AUDIO_RX/AUDIO_TXRX
     uint32_t read_samplerate;
     uint32_t read_cache_size;
+    mics_t   read_which_mic;
     uint8_t  read_channnel_num;
     uint8_t  read_bits_per_sample;
 } audio_parameter_t;
