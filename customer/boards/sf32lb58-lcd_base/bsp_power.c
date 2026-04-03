@@ -8,6 +8,7 @@
 
 #define SD1_RESET_PIN       (49)
 #define SD1_EN_PIN          (80)
+#define SD1_VDD_PIN         (74)
 
 void BSP_GPIO_Set(int pin, int val, int is_porta)
 {
@@ -93,6 +94,7 @@ void BSP_SD_PowerDown(void)
 {
     BSP_GPIO_Set(SD1_EN_PIN, 0, 1);
     BSP_GPIO_Set(SD1_RESET_PIN, 0, 1);
+    BSP_GPIO_Set(SD1_VDD_PIN, 0, 1);
 }
 
 void sd2_pinmux_config()
