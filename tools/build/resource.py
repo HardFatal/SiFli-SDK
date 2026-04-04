@@ -976,6 +976,7 @@ def GenPartitionTableHeaderContentV2(env, mems):
                     s += MakeLine('#undef  {}'.format(offset_name))
                     s += MakeLine('#define {:<50} (0x{:08X})'.format(offset_name, offset))
                     if "UNKNOWN" not in mem_type: 
+                        s += MakeLine('#undef  {}'.format(mem_type_name))
                         s += MakeLine('#define {:<50} {}'.format(mem_type_name, mem_type))
 
             if 'custom' in region:
@@ -1063,6 +1064,7 @@ def GenPartitionTableHeaderContentV1(env, mems):
                 s += MakeLine('#undef  {}'.format(offset_name))
                 s += MakeLine('#define {:<50} (0x{:08X})'.format(offset_name, offset))
                 if "UNKNOWN" not in mem_type: 
+                    s += MakeLine('#undef  {}'.format(mem_type_name))
                     s += MakeLine('#define {:<50} {}'.format(mem_type_name, mem_type))
             if 'custom' in region:
                 for custom in region['custom']:
