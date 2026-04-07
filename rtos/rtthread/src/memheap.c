@@ -260,8 +260,21 @@ __ROM_USED void *rt_memheap_alloc(struct rt_memheap *heap, rt_size_t size)
     RT_ASSERT(heap != RT_NULL);
     RT_ASSERT(rt_object_get_type(&heap->parent) == RT_Object_Class_MemHeap);
 
-    /* align allocated size */
-    size = RT_ALIGN(size, RT_ALIGN_SIZE);
+#if defined (SOLUTION)
+    /* align allocated size. Fix cache line bug when using DMA */
+    if (0 == rt_memcmp(heap->parent.name, "psram_memheap", sizeof("psram_memheap")) ||
+            0 == rt_memcmp(heap->parent.name, "heap", sizeof("heap")))
+    {
+        size = RT_ALIGN(size + sizeof(struct rt_memheap_item), 32);
+        size -= sizeof(struct rt_memheap_item);
+    }
+    else
+#endif
+    {
+        /* align allocated size */
+        size = RT_ALIGN(size, RT_ALIGN_SIZE);
+    }
+
     if (size < RT_MEMHEAP_MINIALLOC)
         size = RT_MEMHEAP_MINIALLOC;
 
