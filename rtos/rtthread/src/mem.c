@@ -1143,6 +1143,15 @@ __ROM_USED rt_uint32_t rt_mem_tail(void)
     return (rt_uint32_t)heap_end;
 }
 
+__ROM_USED rt_uint32_t rt_mem_available_size(void)
+{
+#ifdef RT_MEM_STATS
+    return mem_size_aligned - used_mem;
+#else
+    return mem_size_aligned;
+#endif /* RT_MEM_STATS */
+}
+
 __ROM_USED rt_uint32_t rt_mem_header_size(void)
 {
     return sizeof(struct heap_mem);
