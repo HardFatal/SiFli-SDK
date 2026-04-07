@@ -52,6 +52,8 @@
     #include <intrin.h>
 #endif
 
+#define MEM_USED        0x1ea1
+#define MEM_UNUSE       0x1ea0
 #ifndef RT_USING_MEMHEAP_AS_HEAP
 
 #define RT_MEM_BACKUP_OPT
@@ -167,12 +169,12 @@ static void plug_holes(struct heap_mem *mem)
 
     RT_ASSERT(mem >= heap_ptr);
     RT_ASSERT(mem < heap_end);
-    RT_ASSERT(mem->used == 0);
+    RT_ASSERT(mem->used == MEM_UNUSE);
 
     /* plug hole forward */
     nmem = mem->next;
     if (mem != nmem &&
-            nmem->used == 0 &&
+            nmem->used == MEM_UNUSE &&
             nmem != heap_end)
     {
         /* if mem->next is unused and not end of heap_ptr,
@@ -188,7 +190,7 @@ static void plug_holes(struct heap_mem *mem)
 
     /* plug hole backward */
     pmem = mem->prev;
-    if (pmem != mem && pmem->used == 0)
+    if (pmem != mem && pmem->used == MEM_UNUSE)
     {
         /* if mem->prev is unused, combine mem and mem->prev */
         if (lfree == mem)
@@ -203,11 +205,11 @@ static void plug_holes(struct heap_mem *mem)
 static void update_highest_used(void)
 {
     /* Find prev used block */
-    while (!lused->used && (lused != heap_ptr))
+    while ((MEM_UNUSE == lused->used) && (lused != heap_ptr))
     {
         lused = lused->prev;
     }
-    if ((lused == heap_ptr) && !lused->used)
+    if ((lused == heap_ptr) && (MEM_UNUSE == lused->used))
     {
         lused = RT_NULL;
     }
@@ -218,7 +220,7 @@ static void init_heap_end(struct heap_mem *end)
     RT_ASSERT(end);
 
     end->magic = HEAP_MAGIC;
-    end->used  = 1;
+    end->used  = MEM_USED;
     end->next  = (struct heap_mem *)(((rt_uint8_t *)heap_ptr) + mem_size_aligned + SIZEOF_STRUCT_MEM);
     end->prev  = end->next;
 #ifdef RT_USING_MEMTRACE
@@ -241,7 +243,7 @@ static rt_uint32_t rt_mem_used_size(void)
         if ((rt_uint32_t)next < (rt_uint32_t)heap_end)
         {
             /* next should not be used */
-            RT_ASSERT(0 == next->used);
+            RT_ASSERT(MEM_UNUSE == next->used);
             /* including header of the first unused block */
             used_size += SIZEOF_STRUCT_MEM;
         }
@@ -303,7 +305,7 @@ __ROM_USED void rt_system_heap_init(void *begin_addr, void *end_addr)
     mem->magic = HEAP_MAGIC;
     mem->next  = (struct heap_mem *)(((rt_uint8_t *)heap_ptr) + mem_size_aligned + SIZEOF_STRUCT_MEM);
     mem->prev  = mem;
-    mem->used  = 0;
+    mem->used  = MEM_UNUSE;
 #ifdef RT_USING_MEMTRACE
 #ifdef RT_MEM_RECORD_THREAD_NAME
     rt_mem_setname(mem, "INIT");
@@ -380,8 +382,9 @@ __ROM_USED void *rt_malloc(rt_size_t size)
             mem < (struct heap_mem *)((rt_uint8_t *)heap_ptr + mem_size_aligned - size);
             mem = mem->next)
     {
+        RT_ASSERT(((MEM_UNUSE == mem->used) || (MEM_USED == mem->used)) && (HEAP_MAGIC == mem->magic) && (HEAP_MAGIC == mem->next->magic));
 
-        if ((!mem->used) && (rt_size_t)((rt_uint8_t *)mem->next - ((rt_uint8_t *)mem + SIZEOF_STRUCT_MEM)) >= size)
+        if ((MEM_UNUSE == mem->used) && (rt_size_t)((rt_uint8_t *)mem->next - ((rt_uint8_t *)mem + SIZEOF_STRUCT_MEM)) >= size)
         {
             /* mem is not used and at least perfect fit is possible:
              * mem->next - (ptr + SIZEOF_STRUCT_MEM) gives us the 'user data size' of mem */
@@ -404,7 +407,7 @@ __ROM_USED void *rt_malloc(rt_size_t size)
                 /* create mem2 struct */
                 mem2 = (struct heap_mem *)((rt_uint8_t *)mem + SIZEOF_STRUCT_MEM + size);
                 mem2->magic = HEAP_MAGIC;
-                mem2->used = 0;
+                mem2->used = MEM_UNUSE;
                 mem2->next = mem->next;
                 mem2->prev = mem;
 #ifdef RT_USING_MEMTRACE
@@ -417,7 +420,7 @@ __ROM_USED void *rt_malloc(rt_size_t size)
 
                 /* and insert it between mem and mem->next */
                 mem->next = mem2;
-                mem->used = 1;
+                mem->used = MEM_USED;
 
                 if (mem2->next != heap_end)
                 {
@@ -438,7 +441,7 @@ __ROM_USED void *rt_malloc(rt_size_t size)
                  * also can't move mem->next directly behind mem, since mem->next
                  * will always be used at this point!
                  */
-                mem->used = 1;
+                mem->used = MEM_USED;
 #ifdef RT_MEM_STATS
                 used_mem += ((rt_uint8_t *)mem->next - (rt_uint8_t *)mem);
                 if (max_mem < used_mem)
@@ -475,10 +478,10 @@ __ROM_USED void *rt_malloc(rt_size_t size)
             if (mem == lfree)
             {
                 /* Find next free block after mem and update lowest free pointer */
-                while (lfree->used && lfree != heap_end)
+                while ((MEM_USED == lfree->used) && lfree != heap_end)
                     lfree = lfree->next;
 
-                RT_ASSERT(((lfree == heap_end) || (!lfree->used)));
+                RT_ASSERT(((lfree == heap_end) || (MEM_UNUSE == lfree->used)));
             }
 
             if ((rt_uint32_t)mem > (rt_uint32_t)lused)
@@ -589,7 +592,7 @@ __ROM_USED void *rt_realloc(void *rmem, rt_size_t newsize)
 
         mem2 = (struct heap_mem *)((rt_uint8_t *)mem + SIZEOF_STRUCT_MEM + newsize);
         mem2->magic = HEAP_MAGIC;
-        mem2->used = 0;
+        mem2->used = MEM_UNUSE;
         mem2->next = mem->next;
         mem2->prev = mem;
 #ifdef RT_USING_MEMTRACE
@@ -702,18 +705,18 @@ __ROM_USED void rt_free(void *rmem)
     rt_sem_take(&heap_sem, RT_WAITING_FOREVER);
 
     /* ... which has to be in a used state ... */
-    if (!mem->used || mem->magic != HEAP_MAGIC)
+    if ((MEM_UNUSE == mem->used) || mem->magic != HEAP_MAGIC)
     {
         rt_kprintf("to free a bad data block:\n");
-        rt_kprintf("mem: 0x%08x, used flag: %d, magic code: 0x%04x\n", mem, mem->used, mem->magic);
+        rt_kprintf("mem: 0x%08x, used flag: %d, magic code: 0x%04x\n", mem, mem->used == MEM_UNUSE ? 0 : 1, mem->magic);
     }
-    RT_ASSERT(mem->used);
+    RT_ASSERT(MEM_USED == mem->used);
     RT_ASSERT(mem->magic == HEAP_MAGIC);
     /* check whether this block of memory has been over-written. */
     RT_ASSERT(HEAP_MAGIC == mem->next->magic);
 
     /* ... and is now unused. */
-    mem->used  = 0;
+    mem->used  = MEM_UNUSE;
     mem->magic = HEAP_MAGIC;
 #ifdef RT_USING_MEMTRACE
     /* record free time */
@@ -768,7 +771,7 @@ __ROM_USED rt_size_t rt_mem_size(void *rmem)
     /* Get the corresponding struct heap_mem ... */
     mem = (struct heap_mem *)((rt_uint8_t *)rmem - SIZEOF_STRUCT_MEM);
 
-    RT_ASSERT(mem->used);
+    RT_ASSERT(MEM_USED == mem->used);
     RT_ASSERT(mem->magic == HEAP_MAGIC);
 
     return mem->size;
@@ -829,11 +832,11 @@ static rt_uint32_t rt_mem_backup_contiguous_used_block(rt_uint8_t **buf, struct 
     total_copy_size = 0;
     remaining_size = *max_size;
     /* copy contiguous used block */
-    RT_ASSERT(start_block->used);
+    RT_ASSERT(MEM_USED == start_block->used);
     RT_ASSERT((rt_uint32_t)end_block > (rt_uint32_t)start_block);
     if (end_block != heap_end)
     {
-        RT_ASSERT(!end_block->used);
+        RT_ASSERT(MEM_UNUSE == end_block->used);
     }
     /****************************************************
      *  Format of backuped contiguous blocks
@@ -915,7 +918,7 @@ __ROM_USED rt_err_t rt_mem_backup(rt_uint8_t *buf, rt_uint32_t max_size, rt_uint
     start_block = RT_NULL;
     while (block < heap_end)
     {
-        if (block->used)
+        if (MEM_USED == block->used)
         {
             if (!start_block)
             {
@@ -1013,7 +1016,7 @@ __ROM_USED rt_err_t rt_mem_restore(void *instance, rt_uint8_t *buf, rt_uint32_t 
             return RT_ERROR;
         }
 
-        if (wr->used)
+        if (MEM_USED == wr->used)
         {
             /* copy remaining part */
 
@@ -1199,7 +1202,7 @@ __ROM_USED int memcheck(void)
         if (position < 0) goto __exit;
         if ((rt_size_t)position > mem_size_aligned) goto __exit;
         if (mem->magic != HEAP_MAGIC) goto __exit;
-        if (mem->used != 0 && mem->used != 1) goto __exit;
+        if ((mem->used != MEM_UNUSE) && (mem->used != MEM_USED)) goto __exit;
     }
     rt_hw_interrupt_enable(level);
 
@@ -1208,7 +1211,7 @@ __exit:
     rt_kprintf("Memory block wrong:\n");
     rt_kprintf("address: 0x%08x\n", mem);
     rt_kprintf("  magic: 0x%04x\n", mem->magic);
-    rt_kprintf("   used: %d\n", mem->used);
+    rt_kprintf("   used: %d\n", mem->used == MEM_UNUSE ? 0 : 1);
     rt_kprintf("  size: %d\n", (rt_uint8_t *)mem->next - (rt_uint8_t *)heap_ptr - position - SIZEOF_STRUCT_MEM);
     rt_hw_interrupt_enable(level);
 
@@ -1251,7 +1254,7 @@ __ROM_USED int memtrace(int argc, char **argv)
         rt_kprintf(" 0x%08x", mem->ret_addr);
         rt_kprintf(" 0x%08x", mem->next);
 
-        rt_kprintf(" %d", mem->used);
+        rt_kprintf(" %d", mem->used == MEM_UNUSE ? 0 : 1);
         rt_kprintf(" %-20d", mem->tick);
 
         if (mem->magic != HEAP_MAGIC)
