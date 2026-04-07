@@ -658,8 +658,18 @@ __ROM_USED void *rt_calloc(rt_size_t count, rt_size_t size)
 
     /* zero the memory */
     if (p)
+    {
         rt_memset(p, 0, count * size);
-
+#ifdef RT_USING_MEMTRACE
+        struct heap_mem *mem = (struct heap_mem *)((rt_uint8_t *) p - SIZEOF_STRUCT_MEM);
+        mem->tick = rt_system_get_time();
+#ifdef _MSC_VER
+        mem->ret_addr = (rt_uint32_t) _ReturnAddress();
+#else
+        mem->ret_addr = (rt_uint32_t) __builtin_return_address(0);
+#endif /* _MSC_VER */
+#endif /* RT_USING_MEMTRACE */
+    }
     return p;
 }
 RTM_EXPORT(rt_calloc);
