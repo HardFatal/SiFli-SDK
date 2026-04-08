@@ -33,6 +33,7 @@ EXTENSION_VERSION = "2.0.0"
 EXTENSION_API_VERSION = 2
 MIN_SDK_VERSION = None
 SF_PKG_REMOTE_URL = "https://jfrog.sifli.com/artifactory/api/conan/conan-local"
+SF_PKG_PUBLIC_REMOTE_NAME = "artifactory"
 _REMOTE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
@@ -98,7 +99,7 @@ def _normalize_remote_url(url: str) -> str:
     return url.strip().rstrip("/")
 
 
-def _load_remote_list(sdk_ctx: SdkContext) -> List[Dict[str, Any]]:
+def _load_remote_list_data(sdk_ctx: SdkContext) -> List[Dict[str, Any]]:
     try:
         result = sdk_ctx.runner.run(
             ["conan", "remote", "list", "-f", "json"],
@@ -106,17 +107,24 @@ def _load_remote_list(sdk_ctx: SdkContext) -> List[Dict[str, Any]]:
             capture_output=True,
         )
     except CommandExecutionError as exc:
-        raise AuthError("Failed to inspect Conan remotes. Please login again.") from exc
+        raise CommandExecutionError("Failed to inspect Conan remotes.") from exc
     output = result.stdout or "[]"
     try:
         data = json.loads(output)
     except json.JSONDecodeError as exc:
-        raise AuthError(f"Failed to parse conan remote list output: {exc}") from exc
+        raise CommandExecutionError(f"Failed to parse conan remote list output: {exc}") from exc
 
     if not isinstance(data, list):
-        raise AuthError("Unexpected conan remote list payload")
+        raise CommandExecutionError("Unexpected conan remote list payload")
 
     return [item for item in data if isinstance(item, dict)]
+
+
+def _load_remote_list(sdk_ctx: SdkContext) -> List[Dict[str, Any]]:
+    try:
+        return _load_remote_list_data(sdk_ctx)
+    except CommandExecutionError as exc:
+        raise AuthError("Failed to inspect Conan remotes. Please login again.") from exc
 
 
 def _load_remote_users(sdk_ctx: SdkContext) -> List[Dict[str, Any]]:
@@ -236,6 +244,21 @@ def _ensure_remote_access(sdk_ctx: SdkContext, required: bool) -> Optional[Tuple
     return user, token, remote_name
 
 
+def _ensure_public_remote(sdk_ctx: SdkContext) -> str:
+    expected_url = _normalize_remote_url(SF_PKG_REMOTE_URL)
+    remotes = _load_remote_list_data(sdk_ctx)
+    remote_info = next((item for item in remotes if item.get("name") == SF_PKG_PUBLIC_REMOTE_NAME), None)
+
+    remote_url = str(remote_info.get("url") or "") if remote_info else ""
+    if _normalize_remote_url(remote_url) != expected_url:
+        sdk_ctx.runner.run(
+            ["conan", "remote", "add", SF_PKG_PUBLIC_REMOTE_NAME, SF_PKG_REMOTE_URL, "--force"],
+            cwd=sdk_ctx.project_dir,
+        )
+
+    return SF_PKG_PUBLIC_REMOTE_NAME
+
+
 def init_callback(sdk_ctx: SdkContext) -> None:
     result = sdk_ctx.runner.run(["conan", "new", "sf-pkg-project"], cwd=sdk_ctx.project_dir, check=False)
     if result.returncode != 0:
@@ -244,11 +267,7 @@ def init_callback(sdk_ctx: SdkContext) -> None:
 
 
 def install_callback(sdk_ctx: SdkContext) -> None:
-    credentials = _ensure_remote_access(sdk_ctx, required=True)
-    if not credentials:
-        raise AuthError("No available user credentials. Please login first.")
-
-    _user, _token, remote_name = credentials
+    remote_name = _ensure_public_remote(sdk_ctx)
     sdk_ctx.runner.run(
         [
             "conan",
@@ -311,11 +330,7 @@ def build_callback(sdk_ctx: SdkContext, version: str) -> None:
 
 
 def search_callback(sdk_ctx: SdkContext, name: str) -> None:
-    credentials = _ensure_remote_access(sdk_ctx, required=True)
-    if not credentials:
-        raise AuthError("No available user credentials. Please login first.")
-
-    _user, _token, remote_name = credentials
+    remote_name = _ensure_public_remote(sdk_ctx)
     search_pattern = name if "*" in name else f"{name}/*"
     sdk_ctx.runner.run(["conan", "search", search_pattern, f"-r={remote_name}"], cwd=sdk_ctx.project_dir)
     print(f"Search completed for: {search_pattern}")
