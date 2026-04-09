@@ -96,17 +96,17 @@ static int app_emmc_partition_init(void)
         return -1;
     }
 
-    // /* 创建 eMMC 分区设备 */
-    // for (i = 0; i < len; i++)
-    // {
-    //     if ((fal_flash = fal_flash_device_find(partition[i].flash_name)) == NULL)
-    //         continue;
-    //     if (fal_flash->nand_flag == 2)
-    //     {
-    //         rt_mmcsd_blk_device_create(partition[i].flash_name, partition[i].name,
-    //                                    partition[i].offset >> 9, partition[i].len >> 9);
-    //     }
-    // }
+    /* 创建 eMMC 分区设备 */
+    for (i = 0; i < len; i++)
+    {
+        if ((fal_flash = fal_flash_device_find(partition[i].flash_name)) == NULL)
+            continue;
+        if (fal_flash->nand_flag == 2)
+        {
+            rt_mmcsd_blk_device_create(partition[i].flash_name, partition[i].name,
+                                       partition[i].offset >> 9, partition[i].len >> 9);
+        }
+    }
 
 #ifdef PKG_FDB_USING_FILE_POSIX_MODE
     {

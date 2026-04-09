@@ -113,7 +113,7 @@ static fdb_err_t dfu_db_init(void)
     path = fal->path_name;
 #endif
     int sec_size = PKG_FLASHDB_ERASE_GRAN;
-    int max_size = 16 * 1024;
+    int max_size = (int)fal->len;
     bool file_mode = true;
     rt_kprintf("dfu_db_init: sector_size %d size %d\n", sec_size, max_size);
     fdb_kvdb_control(p_dfu_db, FDB_KVDB_CTRL_SET_SEC_SIZE, (void *)&sec_size);
