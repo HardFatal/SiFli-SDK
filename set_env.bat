@@ -4,6 +4,7 @@
 set SIFLI_SDK=%~dp0
 set SIFLI_SDK_PATH=%~dp0
 set PKGS_DIR=%PKGS_ROOT%
+set CONAN_HOME=%ENV_ROOT%\tools\conan
 
 set "ver_check=1.1.3"
 if not defined ENV_VER (
@@ -72,6 +73,7 @@ set PATH=%PYTHONHOME%;%PATH%
 set PATH=%PYTHONPATH%;%PATH%
 set PATH=%SCONS%;%PATH%
 set PATH=%ENV_ROOT%\tools\qemu\qemu32;%PATH%
+set PATH=%ENV_ROOT%\tools\cmake\bin;%PATH%
 
 set PYTHONPATH= %PYTHONPATH%;%SIFLI_SDK%tools\build;%SIFLI_SDK%tools\build\default;
 set SIFLI_SDK=%SIFLI_SDK:\=/%
