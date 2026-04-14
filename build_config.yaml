@@ -154,7 +154,19 @@ common_projects:
   - path: example/ble/ams/project
     boards: *default_boards
 
+  - path: example/ble/bacs/project
+    boards: *default_boards
+
   - path: example/ble/central_and_peripheral/project/hcpu
+    boards: *default_boards
+
+  - path: example/ble/cppc/project
+    boards: *default_boards
+
+  - path: example/ble/cscpc/project
+    boards: *default_boards
+
+  - path: example/ble/diss/project
     boards: *default_boards
 
   - path: example/ble/file_transfer/project
@@ -163,7 +175,16 @@ common_projects:
   - path: example/ble/hid/project
     boards: *default_boards
 
+  - path: example/ble/hrpc/project
+    boards: *default_boards
+
+  - path: example/ble/iBeacon/project
+    boards: *default_boards
+
   - path: example/ble/multi_connection/project/common
+    boards: *default_boards
+
+  - path: example/ble/pair/project
     boards: *default_boards
 
   - path: example/ble/periodic_adv/project
@@ -179,6 +200,9 @@ common_projects:
     boards: *after_55x_boards
 
   - path: example/ble/throughput/project
+    boards: *default_boards
+
+  - path: example/ble/tip_cts/project
     boards: *default_boards
 
   - path: example/bt/HCI_over_uart/project
@@ -257,10 +281,16 @@ common_projects:
   - path: example/cherryusb/host/hid/project
     boards: *devkit-boards
 
+  - path: example/cherryusb/host/msc_host/project
+    boards: *devkit-boards
+
   - path: example/get-started/blink/rtt/project
     boards: *default_boards
 
   - path: example/get-started/blink/no-os/project
+    boards: *default_boards
+
+  - path: example/get-started/dualcore/project
     boards: *default_boards
 
   - path: example/get-started/hello_world/no-os/project
@@ -270,16 +300,23 @@ common_projects:
     boards: *default_boards
 
   - path: example/hal/adc/adc_battery/project
+    boards: *devkit_lcd_boards
+
+  - path: example/hal/adc/multichannel/project
     boards: *525_devkit_lcd_boards
 
   - path: example/hal/aes/project
     boards: *devkit_lcd_boards
 
+  - path: example/hal/can/project
+    boards: 
+      - sf32lb56-lcd_n16r12n1
+
   - path: example/hal/crc/project
     boards: *devkit_lcd_boards
 
   - path: example/hal/epic/project
-    boards: *525_devkit_lcd_boards
+    boards: *devkit_lcd_boards
 
   - path: example/hal/ezip/project
     boards: *devkit_lcd_boards
@@ -287,10 +324,12 @@ common_projects:
   - path: example/hal/facc/project
     boards:
       - sf32lb56-lcd_n16r12n1
+      - sf32lb58-lcd_n16r32n1_qspi
 
   - path: example/hal/fft/simple/project
     boards:
       - sf32lb56-lcd_n16r12n1
+      - sf32lb58-lcd_n16r32n1_qspi
 
   - path: example/hal/gpio/project
     boards: *devkit_lcd_boards
@@ -312,6 +351,7 @@ common_projects:
   - path: example/hal/nnacc/project
     boards:
       - sf32lb56-lcd_n16r12n1
+      - sf32lb58-lcd_n16r32n1_qspi
 
   - path: example/hal/pwm/project
     boards: *devkit_lcd_boards
@@ -340,25 +380,30 @@ common_projects:
   - path: example/hal/wdt/wdt1/project
     boards: *devkit_lcd_boards
 
+  - path: example/hal/wdt/iwdt/project
+    boards: *devkit_lcd_boards
+
   - path: example/hal_example/project
     boards: *default_boards
 
   - path: example/jpeg_dec/project
     boards: 
-      - sf32lb58-lcd_n16r64n4
+      - sf32lb58-lcd_n16r32n1_qspi
   
   - path: example/misc/button/project
     boards: *devkit_lcd_boards
 
   - path: example/misc/elm_rw/project
-    boards: *525_devkit_lcd_boards
+    boards: *devkit_lcd_boards
+
+  - path: example/misc/generate_lib/project
+    boards:
+      - dummy
+      - pc
 
   - path: example/multicore/acpu_task/project/hcpu
     boards: 
-      - sf32lb58-lcd_n16r64n4
-
-  - path: example/multicore/rpmsg-lite/project/hcpu
-    boards: *multicore_boards
+      - sf32lb58-lcd_n16r32n1_qspi
 
   - path: example/multicore/data_service/project/hcpu
     boards: *multicore_boards
@@ -366,20 +411,31 @@ common_projects:
   - path: example/multicore/ipc_queue/project/hcpu
     boards: *multicore_boards
 
+  - path: example/multicore/rpmsg-lite/project/hcpu
+    boards: *multicore_boards
+
   - path: example/multimedia/agif/lvgl/project
-    boards: 
-      - eh-lb525
+    boards: *devkit_lcd_boards
 
   - path: example/multimedia/agif/lvgl_v9/project
-    boards: 
-      - eh-lb525
+    boards: *devkit_lcd_boards
+
+  - path: example/multimedia/audio/dual_adc_dac/project
+    boards:
+      - sf32lb58-lcd_n16r32n1_qspi
 
   - path: example/multimedia/audio/local_music/project
+    boards: *after_55x_boards
+
+  - path: example/multimedia/audio/mixer/project
     boards: *after_55x_boards
 
   - path: example/multimedia/audio/mp3_sd_player/project
     boards: 
       - sf32lb52-lchspi-ulp
+
+  - path: example/multimedia/audio/opus/project
+    boards: *after_55x_boards
 
   - path: example/multimedia/audio/record/project
     boards: *after_55x_boards
