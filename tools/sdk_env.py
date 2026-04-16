@@ -9,6 +9,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -587,6 +588,17 @@ def read_version_txt(root: str) -> str:
     path = os.path.join(root, "version.txt")
     with open(path, "r", encoding="utf-8") as f:
         return f.read().strip()
+
+
+def sdk_release_line(version_txt: str) -> str:
+    match = re.match(r"^v?([0-9]+)\.([0-9]+)(?:\.[0-9]+)?(?:[-+][0-9A-Za-z.-]+)?$", version_txt.strip())
+    if not match:
+        raise SDKEnvError(f"failed to parse SDK release line from version '{version_txt}'")
+    return f"{match.group(1)}.{match.group(2)}"
+
+
+def read_sdk_release_line(root: str) -> str:
+    return sdk_release_line(read_version_txt(root))
 
 
 def python_env_path(config: RuntimeConfig, lock: ProfileLock) -> str:
@@ -1223,7 +1235,7 @@ def build_export_environment(
 
     env_map: Dict[str, str] = {
         "SIFLI_SDK_PATH": root,
-        "SIFLI_SDK_VERSION": read_version_txt(root),
+        "SIFLI_SDK_VERSION": read_sdk_release_line(root),
         "SIFLI_SDK_GIT_HEAD": current_git_head(root),
         "SIFLI_SDK_PROFILE": lock.profile,
         "SIFLI_SDK_PYTHON_ENV_PATH": env_path,

@@ -379,6 +379,60 @@ class TargetParsingTests(unittest.TestCase):
         self.assertEqual(sdk_env.install_command_hint("default", "powershell"), ".\\install.ps1 --profile default")
 
 
+class SDKVersionTests(unittest.TestCase):
+    def test_sdk_release_line_parses_version_txt(self) -> None:
+        self.assertEqual(sdk_env.sdk_release_line("v2.4.0"), "2.4")
+        self.assertEqual(sdk_env.sdk_release_line("2.4.0"), "2.4")
+        self.assertEqual(sdk_env.sdk_release_line("v2.4.0-rc1"), "2.4")
+
+    def test_sdk_release_line_rejects_invalid_version_txt(self) -> None:
+        with self.assertRaises(sdk_env.SDKEnvError):
+            sdk_env.sdk_release_line("release/v2.4")
+
+    def test_build_export_environment_exports_release_line_version(self) -> None:
+        lock = sdk_env.ProfileLock(
+            path="/tmp/lock.json",
+            schema_version=1,
+            profile="default",
+            python_version="3.13.11",
+            python_project_dir="tools/locks/default",
+            python_lock_file="tools/locks/default/uv.lock",
+            default_targets=["all"],
+            tools={"sftool": "0.1.16"},
+            path_order=["sftool"],
+            conan_config_id="sdk.conan-config.v2.4",
+            conan_remote_name="artifactory",
+            conan_remote_url="https://example.com",
+            conan_home_subdir="default",
+        )
+        config = sdk_env.RuntimeConfig(
+            install_root="/tmp/.sifli",
+            cache_root="/tmp/.sifli/cache",
+            staging_root="/tmp/.sifli/staging",
+            offline=False,
+            python_default_index="https://pypi.org/simple",
+            python_indexes=[],
+            python_index_strategy="first-index",
+            sources=[],
+        )
+        with mock.patch("sdk_env.repo_root", return_value="/repo"):
+            with mock.patch("sdk_env.read_sdk_release_line", return_value="2.4"):
+                with mock.patch("sdk_env.current_git_head", return_value="deadbeef"):
+                    with mock.patch("sdk_env.installed_tool_versions", return_value={}):
+                        with mock.patch.dict(os.environ, {"PATH": "/usr/bin"}, clear=True):
+                            env_map = sdk_env.build_export_environment(
+                                config=config,
+                                lock=lock,
+                                plans=[],
+                                env_path="/tmp/.sifli/python_env/default/py3.13.11",
+                                shell="bash",
+                            )
+
+        self.assertEqual(env_map["SIFLI_SDK_VERSION"], "2.4")
+        self.assertEqual(env_map["SIFLI_SDK_PATH"], "/repo")
+        self.assertEqual(env_map["SIFLI_SDK_GIT_HEAD"], "deadbeef")
+
+
 class ExportErrorMessageTests(unittest.TestCase):
     def test_handle_export_never_choice_mentions_exact_install_command(self) -> None:
         lock = sdk_env.ProfileLock(
