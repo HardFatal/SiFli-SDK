@@ -31,6 +31,7 @@ dependencies = [
   "semantic_version",
   "json5",
   "windows-curses; sys_platform == 'win32'",
+  "crccheck",
 ]
 
 [build-system]
