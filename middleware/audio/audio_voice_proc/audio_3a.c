@@ -849,8 +849,9 @@ RT_WEAK void hfp_opened_for_xiaozhi(uint32_t samplerate)
 {
 }
 
-void audio_3a_open(uint32_t samplerate, uint8_t is_bt_voice, uint8_t disable_uplink_agc)
+void audio_3a_open(uint32_t samplerate, uint8_t is_bt_voice, uint8_t disable_uplink_agc, uint8_t all_mic_channels)
 {
+    all_mic_channels = 1;
     audio_3a_t *thiz = &g_audio_3a_env;
 #if defined(SOLUTION) && defined(RT_USING_BT)
     bool talk_with_abox = false;
@@ -1096,6 +1097,10 @@ void audio_3a_uplink(uint8_t *fifo, uint16_t fifo_size, uint8_t is_mute, uint8_t
         if (!is_bt_voice)
         {
             rt_ringbuffer_get(p_3a_env->rbuf_out, fifo, 320);
+            if (is_mute)
+            {
+                memset(fifo, 0, 320);
+            }
             return;
         }
         while (rt_ringbuffer_data_len(p_3a_env->rbuf_out) >= 120)

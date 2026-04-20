@@ -290,6 +290,13 @@ extern "C" {
 #define PDM1_L_DMA_INSTANCE             DMA1_Channel4
 #define PDM1_L_DMA_IRQ                  DMAC1_CH4_IRQn
 
+#if !defined(PDM2_L_DMA_INSTANCE) && defined(BSP_USING_PDM2)
+#define PDM2_L_DMA_IRQHandler           DMAC1_CH3_IRQHandler
+#define PDM2_L_DMA_IRQ_PRIO             0
+#define PDM2_L_DMA_INSTANCE             DMA1_Channel3
+#define PDM2_L_DMA_IRQ                  DMAC1_CH3_IRQn
+#endif
+
 #define I2S_TX_DMA_IRQHandler              DMAC1_CH4_IRQHandler
 #define I2S_TX_DMA_IRQ_PRIO                     0
 #define I2S_TX_DMA_INSTANCE                DMA1_Channel4
