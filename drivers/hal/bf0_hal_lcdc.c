@@ -3163,16 +3163,11 @@ __HAL_ROM_USED HAL_StatusTypeDef HAL_LCDC_SendLayerData2Reg(LCDC_HandleTypeDef *
 #define PTC_BTIM_UPDATE      PTC_HCPU_BTIM2_UPDATE
 #define PTC_btim   hwp_btim2
 #define BTIM_RCC_MOD  RCC_MOD_BTIM2
-#if 1 //def SF32LB58X
-// #define  p_DMACH0  DMA1_Channel7
-// #define PTC_DMACH0_TC PTC_HCPU_DMAC1_DONE7
-#define  p_DMACH0  DMA1_Channel5
-#define PTC_DMACH0_TC PTC_HCPU_DMAC1_DONE5
-#else
+#ifdef DMA_SUPPORT_DYN_CHANNEL_ALLOC
 static DMA_HandleTypeDef hdma_ptc_ch0 = {0};
+#endif /* DMA_SUPPORT_DYN_CHANNEL_ALLOC */
 static DMA_Channel_TypeDef *p_DMACH0 = NULL;
 static uint8_t PTC_DMACH0_TC = 0xFF;
-#endif /* SF32LB58X */
 
 #define  p_extDMA  hwp_extdma
 #define PTC_extDMA_TC PTC_HCPU_EXTDMA_DONE
@@ -3233,7 +3228,7 @@ static uint8_t PTC_DMACH0_TC = 0xFF;
 
 static void DMA_channel_init(void)
 {
-    #ifdef DMA_SUPPORT_DYN_CHANNEL_ALLOC
+#ifdef DMA_SUPPORT_DYN_CHANNEL_ALLOC
 
     /*Dynamic allocation of DMA channels*/
     memset(&hdma_ptc_ch0, 0, sizeof(hdma_ptc_ch0));
@@ -3305,18 +3300,15 @@ static void SPI_AUX_HW_FSM_START(LCDC_HandleTypeDef *lcdc)
     HAL_RCC_EnableModule(BTIM_RCC_MOD);
     HAL_RCC_EnableModule(RCC_MOD_PTC1);
 
-#ifdef SF32LB58X
 
-#else
-  DMA_channel_init();
-#endif /* SF32LB58X */
- 
+    DMA_channel_init();
+
     SPI_AUX_RST_HW_FSM();
 
     //Set canvas area as 1-line at roi.y0
     lcdc->Instance->CANVAS_TL_POS = (lcdc->roi.x0 << LCD_IF_CANVAS_TL_POS_X0_Pos) | (lcdc->roi.y0 << LCD_IF_CANVAS_TL_POS_Y0_Pos);
     lcdc->Instance->CANVAS_BR_POS = (lcdc->roi.x1 << LCD_IF_CANVAS_BR_POS_X1_Pos) | (lcdc->roi.y0 << LCD_IF_CANVAS_BR_POS_Y1_Pos);
-    
+
     MODIFY_REG(lcdc->Instance->SPI_IF_CONF, LCD_IF_SPI_IF_CONF_WR_LEN_Msk, (4 - 1) << LCD_IF_SPI_IF_CONF_WR_LEN_Pos); //Set command length to 4 bytes
 
 ///////////////////////////////////
@@ -3806,12 +3798,10 @@ static void DPI_HW_FSM_START(LCDC_HandleTypeDef *lcdc)
 #endif /* SF32LB56X */
 
 
-#ifdef SF32LB58X
 
-#else
-DMA_channel_init();
+    DMA_channel_init();
 
-#endif /* SF32LB58X */
+
 
     uint32_t psram_data;
     uint32_t vsh0_hsw_cfg1;//Only Hsync cfg
