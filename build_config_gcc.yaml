@@ -288,7 +288,7 @@ common_projects:
     boards: *default_boards
 
   - path: example/get-started/dualcore/project/hcpu
-    boards: *default_boards
+    boards: *devkit-boards
 
   - path: example/get-started/hello_world/no-os/project
     boards: *default_boards
